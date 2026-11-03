@@ -18,7 +18,8 @@ scripts/check-stubs.sh
 echo "== release build"
 cargo build $J --workspace --release
 echo "== headless smoke: IPPON 600 frames, replay record + verify"
-tmp=$(mktemp -d)
+tmp=target/smoke
+rm -rf "$tmp" && mkdir -p "$tmp"
 target/release/ippon --headless --frames 600 --random-inputs --seed 42 \
   --record "$tmp/smoke.kgmr" --screenshot "$tmp/smoke.png" | tee "$tmp/report.txt"
 target/release/ippon --verify "$tmp/smoke.kgmr" | tee -a "$tmp/report.txt"
