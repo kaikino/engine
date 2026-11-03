@@ -1,0 +1,16 @@
+[package]
+name = "hello"
+description = "The smallest KAGAMI cartridge: a bouncing greeting."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+kagami = { workspace = true }
+kagami-runtime = { workspace = true }
+
+[lints]
+workspace = true

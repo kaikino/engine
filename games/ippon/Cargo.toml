@@ -1,0 +1,23 @@
+[package]
+name = "ippon"
+description = "IPPON: a two-player kendo duel for KAGAMI. The reference cartridge for lockstep netplay."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "ippon"
+path = "src/main.rs"
+
+[dependencies]
+kagami = { workspace = true }
+kagami-runtime = { workspace = true }
+
+[lints]
+workspace = true

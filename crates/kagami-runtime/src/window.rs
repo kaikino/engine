@@ -363,9 +363,11 @@ pub fn run<G: Game + 'static>(
     };
 
     let now = Instant::now();
+    let mut gpu = Gpu::new();
+    session.game().setup(&mut gpu);
     let mut app = App {
         session,
-        gpu: Gpu::new(),
+        gpu,
         keymap: KeyMap::default(),
         controllers: Controllers::default(),
         window: None,

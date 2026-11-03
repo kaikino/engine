@@ -66,6 +66,11 @@ pub trait Game {
     where
         Self: Sized;
 
+    /// Loads tiles into the picture processor. Called once by the runtime
+    /// before the first `draw`, and again if the GPU is ever recreated.
+    /// Must not touch game state.
+    fn setup(&self, _gpu: &mut Gpu) {}
+
     /// Advances the simulation by exactly one frame.
     fn update(&mut self, ctx: &mut UpdateCtx);
 
@@ -77,7 +82,7 @@ pub trait Game {
     fn hash(&self, h: &mut StateHasher);
 
     /// Title shown in the window chrome. Defaults to the type name.
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         core::any::type_name::<Self>()
     }
 

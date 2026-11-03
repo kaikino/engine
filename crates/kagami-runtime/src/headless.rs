@@ -55,7 +55,8 @@ impl fmt::Display for HeadlessReport {
 /// Seeded pseudo-random controller input for soak tests and screenshots.
 ///
 /// Each player holds a random input for a random 4–20 frames, which looks a
-/// lot more like a human than per-frame noise.
+/// lot more like a human than per-frame noise. START is never random, but
+/// player 0 presses it once on frame 5 so title screens advance.
 pub struct RandomInputs {
     rng: Rng,
     held: [Input; MAX_PLAYERS],
@@ -82,6 +83,9 @@ impl RandomInputs {
                 self.until[p] = frame + 4 + self.rng.below(17);
             }
             *slot = self.held[p];
+        }
+        if frame == 5 {
+            out[0] |= Input::START;
         }
         out
     }
@@ -154,6 +158,7 @@ pub fn run_headless<G: Game>(opts: &Options) -> Result<HeadlessReport, Box<dyn s
                 session.apu_mut().render_frame(&mut audio);
             }
             let mut gpu = Gpu::new();
+            session.game().setup(&mut gpu);
             gpu.begin_frame();
             session.game().draw(&mut gpu);
             gpu.render();
@@ -328,6 +333,7 @@ mod tests {
         assert!(changed);
         assert_eq!(r.frame(0, 1)[1], Input::NONE);
         assert!(r.frame(0, 1)[0].bits() & 0x80 == 0, "START is never random");
+        assert!(r.frame(5, 1)[0].start(), "except once on frame 5");
     }
 
     #[test]
