@@ -1,0 +1,18 @@
+[package]
+name = "kagami"
+description = "KAGAMI: a deterministic, lockstep-multiplayer fantasy console with a retro Japanese aesthetic. Zero dependencies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["game-engine", "fantasy-console", "lockstep", "deterministic", "retro"]
+categories = ["game-engines", "game-development"]
+readme = "../../README.md"
+
+[dependencies]
+
+[lints]
+workspace = true

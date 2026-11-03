@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = ["crates/kagami"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+repository = "https://github.com/kaikino/engine"
+homepage = "https://github.com/kaikino/engine"
+authors = ["kaikino"]
+
+[workspace.dependencies]
+kagami = { path = "crates/kagami", version = "0.1.0" }
+kagami-runtime = { path = "crates/kagami-runtime", version = "0.1.0" }
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+struct_excessive_bools = "allow"
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"
+many_single_char_names = "allow"
+inline_always = "allow"
+return_self_not_must_use = "allow"
+uninlined_format_args = "allow"
+unreadable_literal = "allow"
+needless_pass_by_value = "allow"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false
+
+[profile.dev.package."*"]
+opt-level = 2
