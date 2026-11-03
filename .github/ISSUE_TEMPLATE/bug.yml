@@ -1,0 +1,34 @@
+name: Bug report
+description: Something is wrong with the console, the runtime or a cartridge.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the command you ran and the output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: v0.1.0 or a commit hash
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and Rust version
+      placeholder: Ubuntu 24.04, rustc 1.80
+  - type: textarea
+    id: replay
+    attributes:
+      label: Replay or desync report
+      description: If it is a desync or a gameplay bug, attach the .kgmr replay (F4 saves one) and the desync line, which names the exact frame.

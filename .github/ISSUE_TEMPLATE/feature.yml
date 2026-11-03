@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a change to the console. Read docs/ROADMAP.md first; hardware limits are permanent.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do that KAGAMI makes hard?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This does not change the display, palette, sprite or tile limits (those are the console).
+          required: true
+        - label: This keeps the simulation deterministic (no floats, no wall clocks, no unordered iteration).
+          required: true

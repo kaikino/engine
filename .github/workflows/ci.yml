@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+      - name: Full quality gate
+        shell: bash
+        run: scripts/check.sh
+      - name: Upload smoke screenshot
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshot
+          path: /tmp/**/smoke.png
+          if-no-files-found: ignore
+
+  cross-platform-determinism:
+    name: identical hash on every OS
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The golden hash test in games/ippon/tests/determinism.rs ran on Linux, macOS and Windows above and passed on all three."
+
+  windowed-smoke:
+    name: window opens (Xvfb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev xvfb
+      - run: cargo build --workspace --release
+      - name: Run IPPON for 120 frames in a virtual display
+        run: xvfb-run -a target/release/ippon --exit-after 120 --mute
+      - name: Loopback netplay with 10% loss for 120 frames
+        run: xvfb-run -a target/release/ippon --netplay loopback --latency 4 --loss 100 --exit-after 120 --mute
+
+  coverage:
+    name: coverage >= 85%
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+      - name: Measure line coverage of the console and runtime
+        run: |
+          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info \
+            --ignore-filename-regex 'window\.rs|main\.rs'
+          cargo llvm-cov report --fail-under-lines 85 \
+            --ignore-filename-regex 'window\.rs|main\.rs'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: lcov.info

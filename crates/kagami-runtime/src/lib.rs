@@ -92,3 +92,67 @@ pub fn run_with_options<G: Game + 'static>(
         Mode::Window => window::run::<G>(opts, out),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kagami::{Gpu, StateHasher, UpdateCtx};
+
+    struct Tick(u32);
+    impl Game for Tick {
+        fn new(seed: u32) -> Self {
+            Tick(seed)
+        }
+        fn update(&mut self, ctx: &mut UpdateCtx) {
+            self.0 = self.0.wrapping_add(1 + u32::from(ctx.input(0).bits()));
+        }
+        fn draw(&self, gpu: &mut Gpu) {
+            gpu.clear(kagami::palette::KI);
+        }
+        fn hash(&self, h: &mut StateHasher) {
+            h.write_u32(self.0);
+        }
+    }
+
+    fn args(s: &str) -> Vec<String> {
+        s.split_whitespace().map(str::to_string).collect()
+    }
+
+    #[test]
+    fn help_prints_usage() {
+        let mut out = Vec::new();
+        run_with_args::<Tick>(&args("--help"), &mut out).unwrap();
+        assert!(String::from_utf8(out).unwrap().contains("HEADLESS"));
+    }
+
+    #[test]
+    fn headless_runs_and_reports() {
+        let mut out = Vec::new();
+        run_with_args::<Tick>(&args("--headless --frames 3 --seed 5"), &mut out).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("frames: 3"));
+        assert!(text.contains("state hash:"));
+    }
+
+    #[test]
+    fn errors_are_returned() {
+        let mut out = Vec::new();
+        assert!(run_with_args::<Tick>(&args("--bogus"), &mut out).is_err());
+        assert!(run_with_args::<Tick>(&args("--verify /nonexistent/x.kgmr"), &mut out).is_err());
+        // A replay whose checkpoint disagrees is an error, not a silent pass.
+        let dir = std::env::temp_dir().join(format!("kagami-lib-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bad.kgmr");
+        let mut r = kagami::replay::Replay::record::<Tick>(1, 1, 10, 5, |_| {
+            [kagami::Input::NONE; kagami::MAX_PLAYERS]
+        });
+        r.checkpoints[1].1 ^= 1;
+        std::fs::write(&path, r.encode()).unwrap();
+        let err = run_with_args::<Tick>(
+            &["--verify".to_string(), path.to_string_lossy().into_owned()],
+            &mut out,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("diverged"));
+    }
+}

@@ -48,7 +48,7 @@ fn six_hundred_frames_twice_hash_identically() {
     // The match actually happened: we are past the title and someone acted.
     assert_ne!(a.phase(), Phase::Title);
     let [f0, f1] = *a.fighters();
-    assert!(f0.x != b.fighters()[0].x || true);
+    assert_eq!(f0.x, b.fighters()[0].x);
     assert!(
         f0.x != kagami::Fx::from_int(80)
             || f1.x != kagami::Fx::from_int(176)

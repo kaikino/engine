@@ -453,8 +453,8 @@ impl Ippon {
         for i in 0..IPPON_TO_WIN as i32 {
             let filled0 = self.fighters[0].ippon as i32 > i;
             let filled1 = self.fighters[1].ippon as i32 > i;
-            let c0 = if filled0 { pal::GOFUN } else { pal::NAMARI };
-            let c1 = if filled1 { pal::BENI } else { pal::NAMARI };
+            let c0 = if filled0 { pal::GOFUN } else { pal::SUMI };
+            let c1 = if filled1 { pal::BENI } else { pal::SUMI };
             gpu.rect_fill(52 + i * 10, 5, 6, 6, c0);
             gpu.rect_fill(SCREEN_W as i32 - 58 - i * 10, 5, 6, 6, c1);
         }
@@ -625,13 +625,15 @@ impl Game for Ippon {
             }
             Phase::Hajime(t) => {
                 if t > HAJIME_FRAMES / 3 {
+                    gpu.rect_fill(0, 52, SCREEN_W as i32, 32, pal::SUMI);
                     Ippon::draw_big_text(gpu, 60, "HAJIME!", pal::KI);
                 }
             }
             Phase::Fight => {}
             Phase::Point { winner, t } => {
+                gpu.rect_fill(0, 44, SCREEN_W as i32, 44, pal::SUMI);
                 if winner == 2 {
-                    Ippon::draw_big_text(gpu, 60, "AI-UCHI", pal::NEZUMI);
+                    Ippon::draw_big_text(gpu, 58, "AI-UCHI", pal::NEZUMI);
                 } else {
                     let (label, color) = if winner == 0 {
                         ("SHIRO", pal::GOFUN)
