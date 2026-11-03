@@ -28,22 +28,8 @@ pub struct UpdateCtx<'a> {
 }
 
 impl<'a> UpdateCtx<'a> {
-    /// Builds a context with a fresh [`Apu`]. Mostly useful in tests.
-    ///
-    /// The returned context borrows a leaked `Apu`; use [`UpdateCtx::with_apu`]
-    /// in long-running code.
-    pub fn new(inputs: [Input; MAX_PLAYERS], frame: u32) -> UpdateCtx<'static> {
-        let apu: &'static mut Apu = Box::leak(Box::new(Apu::new()));
-        UpdateCtx {
-            inputs,
-            frame,
-            players: MAX_PLAYERS as u8,
-            apu,
-        }
-    }
-
-    /// Builds a context around an existing [`Apu`].
-    pub fn with_apu(
+    /// Builds a context for one frame.
+    pub fn new(
         inputs: [Input; MAX_PLAYERS],
         frame: u32,
         players: u8,
@@ -111,7 +97,7 @@ pub fn simulate<G: Game>(
     mut inputs: impl FnMut(u32) -> [Input; MAX_PLAYERS],
 ) -> u64 {
     for frame in 0..frames {
-        let mut ctx = UpdateCtx::with_apu(inputs(frame), frame, players, apu);
+        let mut ctx = UpdateCtx::new(inputs(frame), frame, players, apu);
         game.update(&mut ctx);
     }
     let mut h = StateHasher::new();
@@ -166,7 +152,8 @@ mod tests {
 
     #[test]
     fn ctx_helpers() {
-        let ctx = UpdateCtx::new([Input::A; MAX_PLAYERS], 5);
+        let mut apu = Apu::new();
+        let ctx = UpdateCtx::new([Input::A; MAX_PLAYERS], 5, 2, &mut apu);
         assert_eq!(ctx.input(0), Input::A);
         assert_eq!(ctx.input(99), Input::NONE);
         assert_eq!(ctx.frame, 5);

@@ -1,0 +1,27 @@
+[package]
+name = "kagami-runtime"
+description = "Native runtime for KAGAMI cartridges: window, audio, keyboard, headless mode, replays and netplay CLI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords = ["game-engine", "fantasy-console", "lockstep", "retro"]
+categories = ["game-engines"]
+
+[dependencies]
+kagami = { workspace = true }
+winit = { version = "0.30", default-features = false, features = ["rwh_06", "x11", "wayland"] }
+softbuffer = { version = "0.4", default-features = false, features = ["x11", "wayland"] }
+cpal = { version = "0.18", optional = true }
+
+[features]
+default = ["audio"]
+## Play sound through the system audio device. Disable for silent builds
+## on machines without an audio stack.
+audio = ["dep:cpal"]
+
+[lints]
+workspace = true

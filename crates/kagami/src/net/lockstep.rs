@@ -101,6 +101,7 @@ pub struct Lockstep {
     desync: Option<Desync>,
     consecutive_stalls: u32,
     stats: LockstepStats,
+    last_inputs: [Input; MAX_PLAYERS],
 }
 
 impl Lockstep {
@@ -143,7 +144,13 @@ impl Lockstep {
             desync: None,
             consecutive_stalls: 0,
             stats: LockstepStats::default(),
+            last_inputs: [Input::NONE; MAX_PLAYERS],
         }
+    }
+
+    /// Inputs used for the most recently advanced frame.
+    pub fn last_inputs(&self) -> [Input; MAX_PLAYERS] {
+        self.last_inputs
     }
 
     /// The configuration.
@@ -317,6 +324,7 @@ impl Lockstep {
         }
         self.frame += 1;
         self.stats.frames += 1;
+        self.last_inputs = out;
         Some(out)
     }
 
@@ -368,7 +376,7 @@ impl Lockstep {
             return StepResult::Waiting(self.waiting_on());
         };
         let frame = self.frame - 1;
-        let mut ctx = UpdateCtx::with_apu(inputs, frame, self.cfg.players, apu);
+        let mut ctx = UpdateCtx::new(inputs, frame, self.cfg.players, apu);
         game.update(&mut ctx);
         let mut h = StateHasher::new();
         game.hash(&mut h);
@@ -551,6 +559,7 @@ mod tests {
                 Input::B
             ]
         );
+        assert_eq!(s.last_inputs()[0], Input::B);
     }
 
     #[test]

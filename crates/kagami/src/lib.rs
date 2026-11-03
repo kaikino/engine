@@ -24,7 +24,7 @@
 //! See the repository `README.md` and `docs/MANUAL.md` for the hardware spec.
 //!
 //! ```
-//! use kagami::{Game, Gpu, Input, StateHasher, UpdateCtx, MAX_PLAYERS};
+//! use kagami::{Apu, Game, Gpu, Input, StateHasher, UpdateCtx, MAX_PLAYERS};
 //!
 //! struct Pong { x: i32 }
 //!
@@ -41,7 +41,8 @@
 //! }
 //!
 //! let mut game = Pong::new(1);
-//! let mut ctx = UpdateCtx::new([Input::RIGHT; MAX_PLAYERS], 0);
+//! let mut apu = Apu::new();
+//! let mut ctx = UpdateCtx::new([Input::RIGHT; MAX_PLAYERS], 0, 1, &mut apu);
 //! game.update(&mut ctx);
 //! assert_eq!(game.x, 1);
 //! ```

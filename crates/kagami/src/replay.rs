@@ -229,7 +229,7 @@ impl Replay {
         };
         for (frame, inputs) in self.frames.iter().enumerate() {
             let frame = frame as u32;
-            let mut ctx = UpdateCtx::with_apu(*inputs, frame, self.players, &mut apu);
+            let mut ctx = UpdateCtx::new(*inputs, frame, self.players, &mut apu);
             game.update(&mut ctx);
             let mut h = StateHasher::new();
             game.hash(&mut h);
@@ -266,7 +266,7 @@ impl Replay {
         for frame in 0..frames {
             let i = inputs(frame);
             replay.push(i);
-            let mut ctx = UpdateCtx::with_apu(i, frame, players, &mut apu);
+            let mut ctx = UpdateCtx::new(i, frame, players, &mut apu);
             game.update(&mut ctx);
             if checkpoint_interval > 0 && frame % checkpoint_interval == 0 {
                 let mut h = StateHasher::new();
@@ -331,7 +331,7 @@ mod tests {
         let mut g = Acc::new(seed);
         let mut apu = Apu::new();
         for f in 0..100 {
-            let mut ctx = UpdateCtx::with_apu(inputs(f), f, 1, &mut apu);
+            let mut ctx = UpdateCtx::new(inputs(f), f, 1, &mut apu);
             g.update(&mut ctx);
         }
         g.v
