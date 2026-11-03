@@ -381,7 +381,7 @@ mod tests {
             ReplayError::Truncated,
             ReplayError::BadPlayers(0),
         ] {
-            assert!(!e.to_string().is_empty());
+            assert_ne!(e.to_string(), "");
         }
         // Player count clamps on encode.
         let weird = Replay {

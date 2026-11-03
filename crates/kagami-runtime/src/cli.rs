@@ -432,7 +432,7 @@ mod tests {
             UsageError::BadValue("x".into(), "y".into()),
             UsageError::Conflict("x".into()),
         ] {
-            assert!(!e.to_string().is_empty());
+            assert_ne!(e.to_string(), "");
         }
         assert!(USAGE.contains("--headless"));
     }

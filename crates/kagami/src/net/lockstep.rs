@@ -531,7 +531,7 @@ mod tests {
         }
         assert_eq!(g.totals[0], 16 * 10);
         assert_eq!(s.stats().sent, 0);
-        assert!(s.waiting_on().is_empty());
+        assert_eq!(s.waiting_on(), Vec::<u8>::new());
     }
 
     #[test]

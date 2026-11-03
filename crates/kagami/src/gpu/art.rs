@@ -177,7 +177,7 @@ mod tests {
             ArtError::RaggedLine(1),
             ArtError::UnknownChar { ch: 'x', line: 1 },
         ] {
-            assert!(!e.to_string().is_empty());
+            assert_ne!(e.to_string(), "");
         }
     }
 }
