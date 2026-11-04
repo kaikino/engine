@@ -163,6 +163,21 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 | `docs/` | [Manual](docs/MANUAL.md) · [Architecture](docs/ARCHITECTURE.md) · [Determinism](docs/DETERMINISM.md) · [Netcode](docs/NETCODE.md) · [Decisions](docs/DECISIONS.md) · [Roadmap](docs/ROADMAP.md) |
 | `scripts/check.sh` | The full quality gate CI runs: fmt, clippy, docs, tests, placeholder scan, release build, headless smoke, replay verify. |
 
+## Performance
+
+`cargo run --release -p kagami-runtime --example bench` on one core of a
+2026 cloud VM, 3,000 frames with seeded random inputs:
+
+| Cartridge | `update` only | `update` + audio + full render |
+|---|---|---|
+| IPPON | 0.1 µs/frame | 0.50 ms/frame (33× realtime) |
+| HANABI | 0.1 µs/frame | 0.58 ms/frame (29× realtime) |
+
+Simulation is effectively free, which is why rollback can re-simulate eight
+frames without anyone noticing. The compositor is a plain per-scanline loop
+over a `Vec<u8>`; at half a millisecond a frame it leaves the other 16 ms
+to the operating system.
+
 ## Quality bar
 
 - `scripts/check.sh` is green on Linux, macOS and Windows for every commit on `main`.

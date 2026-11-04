@@ -661,6 +661,8 @@ version = "0.2.0"
 dependencies = [
  "cpal",
  "gilrs",
+ "hanabi",
+ "ippon",
  "kagami",
  "softbuffer",
  "winit",

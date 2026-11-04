@@ -18,6 +18,10 @@ softbuffer = { version = "0.4", default-features = false, features = ["x11", "wa
 cpal = { version = "0.18", optional = true }
 gilrs = { version = "0.11", optional = true }
 
+[dev-dependencies]
+ippon = { path = "../../games/ippon" }
+hanabi = { path = "../../games/hanabi" }
+
 [features]
 default = ["audio", "gamepad"]
 ## Play sound through the system audio device. Disable for silent builds

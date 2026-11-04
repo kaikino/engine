@@ -9,6 +9,11 @@ compatibility) are marked **[sim]**.
 
 ## [Unreleased]
 
+### Added
+
+- Hostile-input robustness tests: garbage datagrams, mutated replays and nonsense protocol messages against the wire decoder, the replay decoder, lockstep and rollback.
+- `kagami-runtime --example bench`: headless throughput for both cartridges; numbers in the README.
+
 ## [0.2.0] - 2026-11-04
 
 The console grows up: rollback, the browser, a second cartridge.
