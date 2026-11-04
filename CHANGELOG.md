@@ -9,6 +9,11 @@ compatibility) are marked **[sim]**.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
+Tools and proofs: replays and songs cross between the browser and native
+builds bit for bit, and cartridge authors get an editor for each.
+
 ### Added
 
 - Hostile-input robustness tests: garbage datagrams, mutated replays and nonsense protocol messages against the wire decoder, the replay decoder, lockstep and rollback.
@@ -68,6 +73,7 @@ First release.
 - Documentation: manual, architecture, determinism contract, netcode, decisions, roadmap.
 - CI on Linux, macOS and Windows; coverage gate; release workflow producing binaries for all three.
 
-[Unreleased]: https://github.com/kaikino/engine/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kaikino/engine/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kaikino/engine/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kaikino/engine/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kaikino/engine/releases/tag/v0.1.0

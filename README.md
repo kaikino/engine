@@ -196,9 +196,10 @@ to the operating system.
 
 ## Status
 
-v0.2.0. A complete console you can ship a game on today, native or in the
-browser, with lockstep or rollback netplay on both. One deliberate limit
-remains: games are compiled in (no cartridge loader). The [roadmap](docs/ROADMAP.md) explains what comes next and,
+v0.3.0. A complete console you can ship a game on today, native or in the
+browser, with lockstep or rollback netplay on both, replays that cross
+between the two, and a tile editor and tracker for authoring. One
+deliberate limit remains: games are compiled in (no cartridge loader). The [roadmap](docs/ROADMAP.md) explains what comes next and,
 just as importantly, what will never change.
 
 ## License
