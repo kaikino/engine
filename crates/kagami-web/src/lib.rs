@@ -127,7 +127,7 @@ pub const HEIGHT: u32 = SCREEN_H as u32;
 /// | `kagami_fb_ptr() -> *const u8`, `kagami_fb_len() -> u32` | RGBA framebuffer in wasm memory |
 /// | `kagami_audio_ptr() -> *const i16`, `kagami_audio_len() -> u32` | last frame's samples |
 /// | `kagami_width() -> u32`, `kagami_height() -> u32` | screen size |
-/// | `kagami_hash_lo() -> u32`, `kagami_hash_hi() -> u32` | state hash halves (no BigInt needed) |
+/// | `kagami_hash_lo() -> u32`, `kagami_hash_hi() -> u32` | state hash halves (no `BigInt` needed) |
 /// | `kagami_frame() -> u32` | frames simulated |
 /// | `kagami_set_volume(v: u32)` | master volume 0..=15 |
 /// | `kagami_title_ptr() -> *const u8`, `kagami_title_len() -> u32` | UTF-8 title |
