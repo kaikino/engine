@@ -10,6 +10,7 @@
 //! | Overlay             | direct pixel/line/rect/text drawing on top; ASCII + katakana font |
 //! | Color key           | one palette index is transparent in tiles (default 0) |
 //! | Color remap         | 32-entry remap table applied at scan-out (palette swaps, flashes) |
+//! | Raster effects      | per-scanline scroll per layer, horizontal window masks, mosaic |
 //!
 //! A frame is built in `draw`: set scroll, write tilemaps, push sprites, draw
 //! overlay. The runtime then calls [`Gpu::render`], which composites
@@ -115,6 +116,29 @@ impl Sprite {
     }
 }
 
+/// A horizontal window: the layer is drawn only inside (or only outside)
+/// the pixel columns `x0..x1`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Window {
+    /// First visible column (inclusive).
+    pub x0: i32,
+    /// End column (exclusive).
+    pub x1: i32,
+    /// `true`: draw inside the window. `false`: draw outside it.
+    pub inside: bool,
+}
+
+impl Window {
+    /// Builds a window.
+    pub const fn new(x0: i32, x1: i32, inside: bool) -> Window {
+        Window { x0, x1, inside }
+    }
+    #[inline]
+    fn allows(&self, x: i32) -> bool {
+        (x >= self.x0 && x < self.x1) == self.inside
+    }
+}
+
 /// A background layer.
 #[derive(Clone)]
 pub struct Background {
@@ -125,6 +149,11 @@ pub struct Background {
     pub scroll_y: i32,
     /// Whether the layer is drawn.
     pub enabled: bool,
+    /// Per-scanline horizontal scroll added to `scroll_x`, one entry per
+    /// screen line. Empty means off. Set it with [`Background::set_line_scroll`].
+    pub line_scroll_x: Vec<i32>,
+    /// Optional horizontal window mask.
+    pub window: Option<Window>,
 }
 
 impl Default for Background {
@@ -134,11 +163,29 @@ impl Default for Background {
             scroll_x: 0,
             scroll_y: 0,
             enabled: false,
+            line_scroll_x: Vec::new(),
+            window: None,
         }
     }
 }
 
 impl Background {
+    /// Fills the per-scanline scroll table from a function of the line
+    /// number (the "HDMA" effect: waves, heat haze, parallax strips).
+    pub fn set_line_scroll(&mut self, f: impl Fn(usize) -> i32) {
+        self.line_scroll_x = (0..SCREEN_H).map(f).collect();
+    }
+
+    /// Disables per-scanline scrolling.
+    pub fn clear_line_scroll(&mut self) {
+        self.line_scroll_x.clear();
+    }
+
+    #[inline]
+    fn scroll_x_at(&self, y: usize) -> i32 {
+        self.scroll_x + self.line_scroll_x.get(y).copied().unwrap_or(0)
+    }
+
     /// Writes a tilemap entry (tile index plus flag bits). Coordinates wrap.
     pub fn set(&mut self, tx: i32, ty: i32, entry: u16) {
         let x = tx.rem_euclid(MAP_SIZE as i32) as usize;
@@ -178,6 +225,7 @@ pub struct Gpu {
     remap: [u8; palette::PALETTE_SIZE],
     backdrop: u8,
     color_key: u8,
+    mosaic: u8,
     dropped: u32,
     sprites_rejected: u32,
 }
@@ -205,9 +253,22 @@ impl Gpu {
             remap,
             backdrop: palette::SUMI,
             color_key: palette::SUMI,
+            mosaic: 1,
             dropped: 0,
             sprites_rejected: 0,
         }
+    }
+
+    /// Sets the mosaic block size (`1` = off, up to `16`): backgrounds and
+    /// sprites are pixelated into blocks at scan-out. The overlay is not
+    /// affected. The classic transition and hit effect.
+    pub fn set_mosaic(&mut self, size: u8) {
+        self.mosaic = size.clamp(1, 16);
+    }
+
+    /// Current mosaic block size.
+    pub fn mosaic(&self) -> u8 {
+        self.mosaic
     }
 
     // ----- frame lifecycle -------------------------------------------------
@@ -462,12 +523,22 @@ impl Gpu {
             for layer in 0..BG_LAYERS {
                 self.render_bg_line(layer, y, true);
             }
-            // Overlay.
-            for x in 0..SCREEN_W {
-                let o = self.overlay[row + x];
-                if o != OVERLAY_EMPTY {
-                    self.frame[row + x] = o;
+        }
+        // Mosaic: every block shows its top-left pixel.
+        if self.mosaic > 1 {
+            let m = usize::from(self.mosaic);
+            for y in 0..SCREEN_H {
+                let sy = y - y % m;
+                for x in 0..SCREEN_W {
+                    let sx = x - x % m;
+                    self.frame[y * SCREEN_W + x] = self.frame[sy * SCREEN_W + sx];
                 }
+            }
+        }
+        // Overlay, above everything and unaffected by mosaic.
+        for (dst, &o) in self.frame.iter_mut().zip(self.overlay.iter()) {
+            if o != OVERLAY_EMPTY {
+                *dst = o;
             }
         }
         // Remap and convert.
@@ -490,8 +561,15 @@ impl Gpu {
         let wy = (y as i32 + bg.scroll_y).rem_euclid((MAP_SIZE * TILE_SIZE) as i32) as usize;
         let ty = wy / TILE_SIZE;
         let py = wy % TILE_SIZE;
+        let scroll_x = bg.scroll_x_at(y);
+        let window = bg.window;
         for x in 0..SCREEN_W {
-            let wx = (x as i32 + bg.scroll_x).rem_euclid((MAP_SIZE * TILE_SIZE) as i32) as usize;
+            if let Some(w) = window {
+                if !w.allows(x as i32) {
+                    continue;
+                }
+            }
+            let wx = (x as i32 + scroll_x).rem_euclid((MAP_SIZE * TILE_SIZE) as i32) as usize;
             let entry = bg.map[ty * MAP_SIZE + wx / TILE_SIZE];
             if (entry & PRIORITY != 0) != priority_pass {
                 continue;
@@ -788,6 +866,73 @@ mod tests {
         assert_eq!(g.get_pixel(100, 100), palette::GOFUN);
         assert_eq!(g.get_pixel(101, 100), palette::SUMI);
         assert_eq!(g.tile_pixel(5, 0, 0), palette::BENI);
+    }
+
+    #[test]
+    fn line_scroll_shifts_individual_lines() {
+        let mut g = Gpu::new();
+        let mut tile = vec![palette::SUMI; TILE_PIXELS];
+        for py in 0..TILE_SIZE {
+            tile[py * TILE_SIZE] = palette::KI; // left column of the tile
+        }
+        g.load_tiles(1, &tile);
+        g.bg[0].enabled = true;
+        g.bg[0].set(0, 0, 1);
+        g.bg[0].set_line_scroll(|y| if y == 3 { -5 } else { 0 });
+        assert_eq!(g.bg[0].line_scroll_x.len(), SCREEN_H);
+        g.render();
+        assert_eq!(g.get_pixel(0, 0), palette::KI);
+        assert_eq!(g.get_pixel(5, 3), palette::KI);
+        assert_eq!(g.get_pixel(0, 3), palette::SUMI);
+        g.bg[0].clear_line_scroll();
+        g.render();
+        assert_eq!(g.get_pixel(0, 3), palette::KI);
+        assert_eq!(g.bg[0].line_scroll_x, Vec::<i32>::new());
+    }
+
+    #[test]
+    fn window_masks_columns() {
+        let mut g = Gpu::new();
+        g.load_tiles(1, &solid_tile(palette::KI));
+        g.bg[0].enabled = true;
+        g.bg[0].fill(1);
+        g.bg[0].window = Some(Window::new(100, 150, true));
+        g.render();
+        assert_eq!(g.get_pixel(99, 10), palette::SUMI);
+        assert_eq!(g.get_pixel(100, 10), palette::KI);
+        assert_eq!(g.get_pixel(149, 10), palette::KI);
+        assert_eq!(g.get_pixel(150, 10), palette::SUMI);
+        g.bg[0].window = Some(Window::new(100, 150, false));
+        g.render();
+        assert_eq!(g.get_pixel(99, 10), palette::KI);
+        assert_eq!(g.get_pixel(120, 10), palette::SUMI);
+    }
+
+    #[test]
+    fn mosaic_blocks_layers_but_not_overlay() {
+        let mut g = Gpu::new();
+        let mut tile = vec![palette::SUMI; TILE_PIXELS];
+        tile[0] = palette::KI; // single top-left pixel
+        g.load_tiles(1, &tile);
+        g.bg[0].enabled = true;
+        g.bg[0].fill(1);
+        g.set_mosaic(4);
+        assert_eq!(g.mosaic(), 4);
+        g.begin_frame();
+        g.pixel(2, 2, palette::BENI);
+        g.render();
+        // The 4x4 block at the origin is filled with the top-left pixel...
+        assert_eq!(g.get_pixel(3, 3), palette::KI);
+        assert_eq!(g.get_pixel(4, 0), palette::SUMI);
+        // ...except where the overlay draws.
+        assert_eq!(g.get_pixel(2, 2), palette::BENI);
+        g.set_mosaic(0);
+        assert_eq!(g.mosaic(), 1);
+        g.set_mosaic(99);
+        assert_eq!(g.mosaic(), 16);
+        g.set_mosaic(1);
+        g.render();
+        assert_eq!(g.get_pixel(3, 3), palette::SUMI);
     }
 
     #[test]

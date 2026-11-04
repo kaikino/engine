@@ -18,6 +18,8 @@ compatibility) are marked **[sim]**.
 
 - **Katakana in the system font.** `kagami::gpu::kana` adds the 46 basic kana, small kana, ー, ・, 「」、。 and composes every voiced and semi-voiced form; `Gpu::text` draws them directly. `cargo run -p kagami --example font_sheet` renders the full set.
 
+- **Raster effects.** Per-scanline horizontal scroll tables per background (`Background::set_line_scroll`), horizontal window masks (`Background::window`) and a mosaic register (`Gpu::set_mosaic`). IPPON uses a heat haze on its title and a mosaic ramp when a point is called.
+
 ### Changed
 
 - **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.

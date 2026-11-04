@@ -600,6 +600,28 @@ impl Game for Ippon {
         bg.set(16, 6, art::tile::SCROLL_MID);
         bg.set(16, 7, art::tile::SCROLL_MID);
         bg.set(16, 8, art::tile::SCROLL_BOTTOM);
+        // Raster effects: a heat haze over the dojo on the title screen, and
+        // a mosaic that ramps in while a point is called.
+        match self.phase {
+            Phase::Title => {
+                let t = Fx::from_int(self.frame as i32) / 90;
+                bg.set_line_scroll(|y| {
+                    let wave =
+                        Fx::sin_turns(t + Fx::from_int(y as i32) / 40) * Fx::from_ratio(3, 2);
+                    if y >= 136 {
+                        wave.round()
+                    } else {
+                        0
+                    }
+                });
+            }
+            _ => bg.clear_line_scroll(),
+        }
+        match self.phase {
+            Phase::Point { t, .. } => gpu.set_mosaic(((POINT_FRAMES - t) / 12).min(5) as u8 + 1),
+            Phase::Victory { .. } => gpu.set_mosaic(6),
+            _ => gpu.set_mosaic(1),
+        }
         // Pillars in front of the fighters at the edges.
         let fg = &mut gpu.bg[1];
         fg.enabled = true;

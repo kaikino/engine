@@ -165,7 +165,22 @@ columns by 28 rows. Katakana includes the 46 basic kana, small kana, ー, ・,
 draw time). Hiragana and kanji are not in the font and draw as `?`.
 `cargo run -p kagami --example font_sheet -- font.png` renders the whole set.
 
-### 3.6 Remap
+### 3.6 Raster effects
+
+```rust
+gpu.bg[0].set_line_scroll(|y| wave(y));   // per-scanline horizontal scroll ("HDMA")
+gpu.bg[0].clear_line_scroll();
+gpu.bg[1].window = Some(kagami::gpu::Window::new(64, 192, true)); // draw only inside
+gpu.set_mosaic(4);                          // pixelate layers and objects into 4×4 blocks
+```
+
+Line scroll is per layer and adds to `scroll_x` line by line: waves, heat
+haze, water reflections, parallax strips. A window keeps a layer to a column
+range (or everything but it). Mosaic applies to backgrounds and objects at
+scan-out and leaves the overlay crisp. These are GPU registers, not game
+state: set them in `draw` every frame.
+
+### 3.7 Remap
 
 `gpu.pal(from, to)` makes every pixel of one color display as another, at
 scan-out, without touching tiles. Use it for hit flashes, night palettes
