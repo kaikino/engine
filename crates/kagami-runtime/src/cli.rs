@@ -40,6 +40,8 @@ NETPLAY:
 HEADLESS:
   --headless --frames N [--screenshot FILE] [--record FILE] [--random-inputs]
                        simulate without a window, print the state hash
+  --screenshot-every N with --headless: write frame-NNNNNN.png next to --screenshot every N frames
+  --wav FILE           with --headless: write the audio of the whole run as a 44.1 kHz mono WAV
   --verify FILE        re-simulate a replay and check every checkpoint
   --replay FILE        with --headless: simulate that replay's inputs
 
@@ -86,6 +88,10 @@ pub enum Mode {
         screenshot: Option<String>,
         /// Drive the game with seeded pseudo-random inputs.
         random_inputs: bool,
+        /// Also write a PNG every this many frames (0 = off).
+        screenshot_every: u32,
+        /// Write the run's audio to this WAV file.
+        wav: Option<String>,
     },
     /// Verify a replay file.
     Verify {
@@ -203,6 +209,8 @@ pub fn parse_args(args: &[String]) -> Result<Options, UsageError> {
     let mut frames: Option<u32> = None;
     let mut screenshot = None;
     let mut random_inputs = false;
+    let mut screenshot_every = 0u32;
+    let mut wav = None;
     let mut verify = None;
     let mut netplay_kind: Option<String> = None;
     let mut player = 0u8;
@@ -228,6 +236,8 @@ pub fn parse_args(args: &[String]) -> Result<Options, UsageError> {
             "--random-inputs" => random_inputs = true,
             "--frames" => frames = Some(parse_num(a, &next(&mut i, a)?)?),
             "--screenshot" => screenshot = Some(next(&mut i, a)?),
+            "--screenshot-every" => screenshot_every = parse_num(a, &next(&mut i, a)?)?,
+            "--wav" => wav = Some(next(&mut i, a)?),
             "--verify" => verify = Some(next(&mut i, a)?),
             "--record" => o.record = Some(next(&mut i, a)?),
             "--replay" => o.replay = Some(next(&mut i, a)?),
@@ -339,11 +349,19 @@ pub fn parse_args(args: &[String]) -> Result<Options, UsageError> {
             frames,
             screenshot,
             random_inputs,
+            screenshot_every,
+            wav,
         }
     } else {
-        if frames.is_some() || screenshot.is_some() || random_inputs {
+        if frames.is_some()
+            || screenshot.is_some()
+            || random_inputs
+            || screenshot_every > 0
+            || wav.is_some()
+        {
             return Err(UsageError::Conflict(
-                "--frames, --screenshot and --random-inputs need --headless".to_string(),
+                "--frames, --screenshot, --screenshot-every, --wav and --random-inputs need --headless"
+                    .to_string(),
             ));
         }
         Mode::Window
@@ -399,9 +417,21 @@ mod tests {
             Mode::Headless {
                 frames: 600,
                 screenshot: Some("out.png".into()),
-                random_inputs: true
+                random_inputs: true,
+                screenshot_every: 0,
+                wav: None,
             }
         );
+        let o = p("--headless --frames 10 --screenshot-every 5 --wav run.wav").unwrap();
+        assert!(matches!(
+            o.mode,
+            Mode::Headless {
+                screenshot_every: 5,
+                wav: Some(_),
+                ..
+            }
+        ));
+        assert!(matches!(p("--wav x.wav"), Err(UsageError::Conflict(_))));
         let o = p("--headless --replay m.kgmr").unwrap();
         assert!(matches!(o.mode, Mode::Headless { frames: 0, .. }));
         let o = p("--verify m.kgmr").unwrap();

@@ -52,6 +52,28 @@ impl fmt::Display for HeadlessReport {
     }
 }
 
+/// Encodes 44.1 kHz mono 16-bit samples as a WAV file.
+pub fn wav_bytes(samples: &[i16]) -> Vec<u8> {
+    let data_len = (samples.len() * 2) as u32;
+    let mut v = Vec::with_capacity(44 + samples.len() * 2);
+    v.extend_from_slice(b"RIFF");
+    v.extend_from_slice(&(36 + data_len).to_le_bytes());
+    v.extend_from_slice(b"WAVEfmt ");
+    v.extend_from_slice(&16u32.to_le_bytes()); // chunk size
+    v.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    v.extend_from_slice(&1u16.to_le_bytes()); // mono
+    v.extend_from_slice(&kagami::apu::SAMPLE_RATE.to_le_bytes());
+    v.extend_from_slice(&(kagami::apu::SAMPLE_RATE * 2).to_le_bytes()); // byte rate
+    v.extend_from_slice(&2u16.to_le_bytes()); // block align
+    v.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
+    v.extend_from_slice(b"data");
+    v.extend_from_slice(&data_len.to_le_bytes());
+    for s in samples {
+        v.extend_from_slice(&s.to_le_bytes());
+    }
+    v
+}
+
 /// Seeded pseudo-random controller input for soak tests and screenshots.
 ///
 /// Each player holds a random input for a random 4–20 frames, which looks a
@@ -130,6 +152,8 @@ pub fn run_headless<G: Game>(opts: &Options) -> Result<HeadlessReport, Box<dyn s
             frames,
             screenshot,
             random_inputs,
+            screenshot_every,
+            wav,
         } => {
             let source = match &opts.replay {
                 Some(path) => Some(Replay::decode(&std::fs::read(path)?)?),
@@ -148,6 +172,18 @@ pub fn run_headless<G: Game>(opts: &Options) -> Result<HeadlessReport, Box<dyn s
             let mut session: Session<G> = Session::local(seed, players, source);
             let mut random = RandomInputs::new(seed);
             let mut audio = [0i16; SAMPLES_PER_FRAME];
+            let mut samples: Vec<i16> = Vec::new();
+            let mut gpu = Gpu::new();
+            session.game().setup(&mut gpu);
+            let shots_dir = screenshot.as_deref().map_or_else(
+                || std::path::PathBuf::from("."),
+                |p| {
+                    std::path::Path::new(p).parent().map_or_else(
+                        || std::path::PathBuf::from("."),
+                        std::path::Path::to_path_buf,
+                    )
+                },
+            );
             for f in 0..frames {
                 let inputs = if *random_inputs {
                     random.frame(f, players)
@@ -156,9 +192,22 @@ pub fn run_headless<G: Game>(opts: &Options) -> Result<HeadlessReport, Box<dyn s
                 };
                 let _ = session.tick(inputs);
                 session.apu_mut().render_frame(&mut audio);
+                if wav.is_some() {
+                    samples.extend_from_slice(&audio);
+                }
+                if *screenshot_every > 0 && f % *screenshot_every == 0 {
+                    gpu.begin_frame();
+                    session.game().draw(&mut gpu);
+                    gpu.render();
+                    std::fs::write(
+                        shots_dir.join(format!("frame-{f:06}.png")),
+                        gpu.screenshot_png(),
+                    )?;
+                }
             }
-            let mut gpu = Gpu::new();
-            session.game().setup(&mut gpu);
+            if let Some(path) = wav {
+                std::fs::write(path, wav_bytes(&samples))?;
+            }
             gpu.begin_frame();
             session.game().draw(&mut gpu);
             gpu.render();
@@ -232,6 +281,8 @@ mod tests {
                 frames: 120,
                 screenshot: Some(shot.clone()),
                 random_inputs: true,
+                screenshot_every: 0,
+                wav: None,
             },
             record: Some(rec.clone()),
             seed: 3,
@@ -269,6 +320,8 @@ mod tests {
                 frames: 0,
                 screenshot: None,
                 random_inputs: false,
+                screenshot_every: 0,
+                wav: None,
             },
             replay: Some(rec.clone()),
             ..Options::default()
@@ -293,6 +346,36 @@ mod tests {
     }
 
     #[test]
+    fn wav_and_periodic_screenshots() {
+        let dir = std::env::temp_dir().join(format!("kagami-wav-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let shot = dir.join("final.png").to_string_lossy().into_owned();
+        let wav = dir.join("run.wav").to_string_lossy().into_owned();
+        let opts = Options {
+            mode: Mode::Headless {
+                frames: 25,
+                screenshot: Some(shot),
+                random_inputs: true,
+                screenshot_every: 10,
+                wav: Some(wav.clone()),
+            },
+            ..Options::default()
+        };
+        let r = run_headless::<Dots>(&opts).unwrap();
+        assert_eq!(r.frames, 25);
+        for f in [0, 10, 20] {
+            assert!(dir.join(format!("frame-{f:06}.png")).exists(), "frame {f}");
+        }
+        assert!(!dir.join("frame-000030.png").exists());
+        let bytes = std::fs::read(&wav).unwrap();
+        assert_eq!(&bytes[..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(bytes.len(), 44 + 25 * SAMPLES_PER_FRAME * 2);
+        assert_eq!(wav_bytes(&[]).len(), 44);
+        assert_eq!(&wav_bytes(&[1, -1])[44..], &[1, 0, 255, 255]);
+    }
+
+    #[test]
     fn errors_surface() {
         let missing = tmp("missing.kgmr");
         assert!(run_headless::<Dots>(&Options {
@@ -312,6 +395,8 @@ mod tests {
                 frames: 1,
                 screenshot: Some("/nonexistent-dir/x.png".into()),
                 random_inputs: false,
+                screenshot_every: 0,
+                wav: None,
             },
             ..Options::default()
         };
@@ -344,6 +429,8 @@ mod tests {
                 frames: 2,
                 screenshot: None,
                 random_inputs: false,
+                screenshot_every: 0,
+                wav: None,
             },
             ..Options::default()
         };

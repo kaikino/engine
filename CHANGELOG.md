@@ -13,6 +13,7 @@ compatibility) are marked **[sim]**.
 
 - Hostile-input robustness tests: garbage datagrams, mutated replays and nonsense protocol messages against the wire decoder, the replay decoder, lockstep and rollback.
 - `kagami-runtime --example bench`: headless throughput for both cartridges; numbers in the README.
+- Headless `--wav FILE` writes the run's audio as a WAV (hear the synth without a sound device) and `--screenshot-every N` writes a PNG sequence for trailers and docs.
 - `docs/COOKBOOK.md`: patterns for cartridges (state machines, edges, collections, RNG, fixed point, hitboxes, sound, sprite budget, saves, desync debugging, testing).
 - Replay scrubbing in the browser host: a slider seeks a loaded replay by re-simulating from the start (`kagami_replay_seek`).
 - Soak tests: 6,000 frames of random two-player play for each cartridge, drawn periodically, deterministic at the end.

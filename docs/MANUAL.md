@@ -287,6 +287,8 @@ NETPLAY:
 
 HEADLESS:
   --headless --frames N [--screenshot FILE] [--record FILE] [--random-inputs]
+  --screenshot-every N  also write frame-NNNNNN.png every N frames
+  --wav FILE         write the run's audio as a 44.1 kHz mono WAV
   --verify FILE      re-simulate a replay and check every checkpoint
 ```
 

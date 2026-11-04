@@ -35,7 +35,7 @@ mod window;
 pub use audio::{AudioOutput, Resampler, SampleQueue};
 pub use cli::{parse_args, Mode, NetplayTransport, Options, UsageError, USAGE};
 pub use gamepad::{axis_to_dpad, PadState};
-pub use headless::{run_headless, HeadlessReport, RandomInputs};
+pub use headless::{run_headless, wav_bytes, HeadlessReport, RandomInputs};
 pub use keys::{Controllers, KeyMap};
 pub use session::{NetStats, Session, SessionEvent};
 pub use window::default_sram_path;
