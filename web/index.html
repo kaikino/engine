@@ -40,6 +40,8 @@
     <span>hash <b id="hash">—</b></span>
     <span>fps <b id="fps">0</b></span>
     <button id="sound">sound on</button>
+    <button id="save-replay">save replay</button>
+    <label><input id="load-replay" type="file" accept=".kgmr" hidden>load replay</label>
     <span>P1 arrows · Z X C · Enter — P2 WASD · J K L · Tab</span>
     <span><a href="?cart=ippon" style="color:#a0d8ef">ippon</a> · <a href="?cart=hanabi" style="color:#a0d8ef">hanabi</a></span>
   </div>
@@ -64,6 +66,25 @@
     document.getElementById('title').textContent = console_.title;
     document.getElementById('sound').addEventListener('click', () => console_.enableSound());
     window.kagami = console_;
+
+    // Replays: download the match so far, or drop a .kgmr on the page.
+    document.getElementById('save-replay').addEventListener('click', () => {
+      const bytes = console_.exportReplay();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      a.download = `${cart}-${console_.recordedFrames}f.kgmr`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    const loadReplayFile = async (file) => {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const n = console_.loadReplay(bytes);
+      document.getElementById('title').textContent = n === null ? `${console_.title} (not a replay)` : `${console_.title} replay, ${n} frames`;
+      if (n !== null) console_.start();
+    };
+    document.getElementById('load-replay').addEventListener('change', (e) => { if (e.target.files[0]) loadReplayFile(e.target.files[0]); });
+    document.body.addEventListener('dragover', (e) => e.preventDefault());
+    document.body.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) loadReplayFile(e.dataTransfer.files[0]); });
 
     // Netplay UI.
     const { hostLink, joinLink, attachNetplay } = await import('./netplay.js');

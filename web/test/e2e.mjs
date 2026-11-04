@@ -36,6 +36,24 @@ try {
   }, FRAMES);
   // Input changes the hash: press START on P1 for one frame.
   const withInput = await page.evaluate(() => { const k = window.kagami; k.step(128); return k.hash; });
+  // Record a replay in the browser, play it back in the browser, and save
+  // it for the native binary to verify (see check-web.sh).
+  const replay = await page.evaluate(() => {
+    const k = window.kagami;
+    k.reset(7, 2);
+    for (let i = 0; i < 150; i++) k.step((i === 5 ? 128 : 0) | (i % 9 < 4 ? 16 : 0) | ((i % 13 < 6 ? 4 : 8) << 8));
+    const bytes = Array.from(k.exportReplay());
+    const hash = k.hash;
+    const verify = k.verifyReplay(new Uint8Array(bytes));
+    const loaded = k.loadReplay(new Uint8Array(bytes));
+    for (let i = 0; i < 160; i++) k.step(0xFF);
+    return { bytes, hash, verify, loaded, playbackHash: k.hash, frame: k.frame, playing: k.replayPlaying, len: k.replayLength };
+  });
+  await writeFile(join(root, 'dist', 'browser.kgmr'), Buffer.from(replay.bytes));
+  console.log(`replay: ${replay.bytes.length} bytes, ${replay.loaded} frames, verify ${replay.verify}`);
+  if (replay.verify !== 'ok') throw new Error('browser replay did not verify in the browser');
+  if (replay.loaded !== 150 || replay.frame !== 150 || replay.len !== 150 || !replay.playing) throw new Error('replay playback state wrong');
+  if (replay.playbackHash !== replay.hash) throw new Error('playback diverged from the recording');
   const canvasData = await page.evaluate(() => document.getElementById('screen').toDataURL('image/png'));
   await mkdir(join(root, 'dist'), { recursive: true });
   await writeFile(join(root, 'dist', 'e2e.png'), Buffer.from(canvasData.split(',')[1], 'base64'));

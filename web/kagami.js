@@ -137,6 +137,29 @@ export async function boot({ wasmUrl, canvas, seed = 1, players = 1, autostart =
       const s = (i) => x.kagami_net_stat(i);
       return { frames: s(0), stalls: s(1), sent: s(2), received: s(3), rollbacks: s(4), resimulated: s(5), confirmed: s(6) };
     },
+    /** The match so far as a .kgmr replay (confirmed frames under rollback). */
+    exportReplay() {
+      const n = x.kagami_replay_export();
+      return new Uint8Array(x.memory.buffer, x.kagami_replay_export_ptr(), n).slice();
+    },
+    get recordedFrames() { return x.kagami_replay_frames(); },
+    /** Re-simulates a .kgmr and checks its checkpoints: 'ok', 'invalid', or the first mismatching frame. */
+    verifyReplay(bytes) {
+      new Uint8Array(x.memory.buffer, x.kagami_replay_import_ptr(bytes.length), bytes.length).set(bytes);
+      const r = x.kagami_replay_verify() >>> 0;
+      return r === 0 ? 'ok' : r === 0xFFFFFFFF ? 'invalid' : r - 1;
+    },
+    /** Restarts the cartridge playing a .kgmr back; returns its frame count or null if invalid. */
+    loadReplay(bytes) {
+      new Uint8Array(x.memory.buffer, x.kagami_replay_import_ptr(bytes.length), bytes.length).set(bytes);
+      const n = x.kagami_replay_load() >>> 0;
+      if (n === 0xFFFFFFFF) return null;
+      net = null;
+      this.frame = 0;
+      return n;
+    },
+    get replayPlaying() { return x.kagami_replay_playing() === 1; },
+    get replayLength() { return x.kagami_replay_len(); },
     /** Hash of a confirmed frame, or null if not remembered. */
     confirmedHash(frame) {
       const hi = x.kagami_confirmed_hash_hi(frame), lo = x.kagami_confirmed_hash_lo(frame);

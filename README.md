@@ -99,6 +99,11 @@ CI runs the browser build in headless Chromium and checks that its state
 hash after 120 frames equals the native build's. x86-64 and wasm32 agree bit
 for bit; that is what fixed-point buys you.
 
+The browser host records every match; *save replay* downloads a `.kgmr`
+and dropping one on the page plays it back. CI records a replay in Chromium
+and verifies it with the native binary: the same file, two architectures,
+every checkpoint equal.
+
 Browser netplay needs no server. Open the *netplay* panel, one player makes
 an offer code, the other answers it, and the match runs over a direct WebRTC
 data channel with lockstep or rollback, same as native. CI plays a match

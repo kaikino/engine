@@ -13,6 +13,7 @@ compatibility) are marked **[sim]**.
 
 - Hostile-input robustness tests: garbage datagrams, mutated replays and nonsense protocol messages against the wire decoder, the replay decoder, lockstep and rollback.
 - `kagami-runtime --example bench`: headless throughput for both cartridges; numbers in the README.
+- **Browser replays.** The web console records every match (confirmed frames under rollback), exports and loads `.kgmr` files, verifies checkpoints, and plays replays back; *save replay* and drag-and-drop in the host page. CI records a replay in Chromium and verifies it with the native binary.
 
 ## [0.2.0] - 2026-11-04
 

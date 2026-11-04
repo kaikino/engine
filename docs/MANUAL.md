@@ -303,6 +303,9 @@ dependency under `cfg(not(target_arch = "wasm32"))`. Build with
 The browser host plays over the network too: the *netplay* panel exchanges
 offer and answer codes between two players (no server), opens a WebRTC data
 channel, and runs the same lockstep or rollback session inside the module.
+It also records every match: *save replay* downloads a `.kgmr`, and a
+`.kgmr` dropped on the page (or chosen with *load replay*) plays back.
+Replays are interchangeable with the native runtime's.
 
 ## 8. Netplay
 

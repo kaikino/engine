@@ -30,6 +30,7 @@
 
 use kagami::apu::SAMPLES_PER_FRAME;
 use kagami::net::{Lockstep, LockstepConfig, Rollback, RollbackConfig, StepResult, Transport};
+use kagami::replay::Replay;
 use kagami::{Apu, Game, Gpu, Input, StateHasher, UpdateCtx, MAX_PLAYERS, SCREEN_H, SCREEN_W};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -69,6 +70,11 @@ enum Engine<G: Game> {
         game: G,
         apu: Apu,
     },
+    Playback {
+        game: G,
+        apu: Apu,
+        source: Replay,
+    },
     Lockstep {
         game: G,
         apu: Apu,
@@ -105,6 +111,12 @@ pub struct Console<G: Game> {
     inbox_buf: Vec<u8>,
     outbox_buf: Vec<u8>,
     outbox_to: u8,
+    /// Everything simulated so far (confirmed frames under rollback).
+    recording: Replay,
+    /// Encoded form of `recording`, refreshed by [`Console::export_replay`].
+    export_buf: Vec<u8>,
+    /// Staging area for a replay the host wants loaded.
+    import_buf: Vec<u8>,
 }
 
 impl<G: Game> Console<G> {
@@ -129,7 +141,83 @@ impl<G: Game> Console<G> {
             inbox_buf: vec![0; MAX_DATAGRAM],
             outbox_buf: vec![0; MAX_DATAGRAM],
             outbox_to: 0,
+            recording: Replay::new(seed, players.clamp(1, MAX_PLAYERS as u8)),
+            export_buf: Vec::new(),
+            import_buf: Vec::new(),
         }
+    }
+
+    // ----- replays -------------------------------------------------------
+
+    /// Prepares a staging buffer of `len` bytes for a replay file and
+    /// returns it for the host to fill.
+    pub fn import_buf(&mut self, len: usize) -> &mut [u8] {
+        self.import_buf.clear();
+        self.import_buf.resize(len.min(1 << 24), 0);
+        &mut self.import_buf
+    }
+
+    /// Decodes the staged replay and restarts the cartridge playing it
+    /// back; inputs passed to `step` are ignored until it ends. Returns the
+    /// number of frames, or `None` if the data is not a replay.
+    pub fn load_replay(&mut self) -> Option<u32> {
+        let source = Replay::decode(&self.import_buf).ok()?;
+        self.seed = source.seed;
+        self.players = source.players;
+        self.frame = 0;
+        self.transport = QueueTransport::default();
+        self.status = NetStatus::Ok;
+        self.confirmed_hashes.clear();
+        self.recording = Replay::new(source.seed, source.players);
+        let game = G::new(source.seed);
+        let frames = source.len() as u32;
+        self.engine = Engine::Playback {
+            game,
+            apu: Apu::new(),
+            source,
+        };
+        Some(frames)
+    }
+
+    /// `true` while a loaded replay is driving the inputs.
+    pub fn is_playback(&self) -> bool {
+        matches!(self.engine, Engine::Playback { .. })
+    }
+
+    /// Frames in the loaded replay (0 when not playing one back).
+    pub fn playback_len(&self) -> u32 {
+        match &self.engine {
+            Engine::Playback { source, .. } => source.len() as u32,
+            _ => 0,
+        }
+    }
+
+    /// Re-simulates the staged replay from scratch and checks its
+    /// checkpoints: `Some(0)` on success, `Some(frame + 1)` for the first
+    /// mismatching checkpoint, `None` if the data is not a replay.
+    pub fn verify_replay(&self) -> Option<u32> {
+        let r = Replay::decode(&self.import_buf).ok()?;
+        Some(match r.verify::<G>() {
+            Ok(_) => 0,
+            Err(m) => m.frame + 1,
+        })
+    }
+
+    /// Encodes the recording so far into the export buffer; returns its
+    /// length.
+    pub fn export_replay(&mut self) -> usize {
+        self.export_buf = self.recording.encode();
+        self.export_buf.len()
+    }
+
+    /// The encoded replay produced by [`Console::export_replay`].
+    pub fn export_buf(&self) -> &[u8] {
+        &self.export_buf
+    }
+
+    /// Frames recorded so far.
+    pub fn recorded_frames(&self) -> u32 {
+        self.recording.len() as u32
     }
 
     /// Restarts the cartridge as a netplay peer. `prediction == 0` selects
@@ -141,6 +229,7 @@ impl<G: Game> Console<G> {
         self.transport = QueueTransport::default();
         self.status = NetStatus::Ok;
         self.confirmed_hashes.clear();
+        self.recording = Replay::new(self.seed, self.players);
         let game = G::new(self.seed);
         self.engine = if prediction == 0 {
             let cfg = LockstepConfig {
@@ -179,11 +268,15 @@ impl<G: Game> Console<G> {
         self.transport = QueueTransport::default();
         self.status = NetStatus::Ok;
         self.confirmed_hashes.clear();
+        self.recording = Replay::new(self.seed, self.players);
     }
 
     /// `true` while a netplay session is active.
     pub fn is_net(&self) -> bool {
-        !matches!(self.engine, Engine::Local { .. })
+        matches!(
+            self.engine,
+            Engine::Lockstep { .. } | Engine::Rollback { .. }
+        )
     }
 
     /// Hands a datagram from the network to the session.
@@ -234,6 +327,25 @@ impl<G: Game> Console<G> {
                 self.frame += 1;
                 let h = kagami::hash::hash_with(|h| game.hash(h));
                 remembered.push((frame, h));
+                self.recording.push(inputs);
+                if frame % 60 == 0 {
+                    self.recording.checkpoint(frame, h);
+                }
+                apu.render_frame(&mut self.audio);
+            }
+            Engine::Playback { game, apu, source } => {
+                if (frame as usize) < source.len() {
+                    let inputs = source.inputs(frame);
+                    let mut ctx = UpdateCtx::new(inputs, frame, self.players, apu);
+                    game.update(&mut ctx);
+                    self.frame += 1;
+                    let h = kagami::hash::hash_with(|h| game.hash(h));
+                    remembered.push((frame, h));
+                    self.recording.push(inputs);
+                    if frame % 60 == 0 {
+                        self.recording.checkpoint(frame, h);
+                    }
+                }
                 apu.render_frame(&mut self.audio);
             }
             Engine::Lockstep { game, apu, session } => {
@@ -245,6 +357,10 @@ impl<G: Game> Console<G> {
                         self.frame = f + 1;
                         let h = kagami::hash::hash_with(|h| game.hash(h));
                         remembered.push((f, h));
+                        self.recording.push(session.last_inputs());
+                        if f % 60 == 0 {
+                            self.recording.checkpoint(f, h);
+                        }
                         NetStatus::Ok
                     }
                     StepResult::Waiting(w) => {
@@ -258,8 +374,12 @@ impl<G: Game> Console<G> {
                 let local = session.config().local_player as usize;
                 let input = Input::from_bits((packed >> (local * 8)) as u8);
                 let r = session.step(input, &mut self.transport);
-                for (f, _, h) in session.drain_confirmed() {
+                for (f, inputs, h) in session.drain_confirmed() {
                     remembered.push((f, h));
+                    self.recording.push(inputs);
+                    if f % 60 == 0 {
+                        self.recording.checkpoint(f, h);
+                    }
                 }
                 self.status = match r {
                     StepResult::Advanced(f) => {
@@ -280,7 +400,9 @@ impl<G: Game> Console<G> {
         let gpu = &mut self.gpu;
         gpu.begin_frame();
         match &self.engine {
-            Engine::Local { game, .. } | Engine::Lockstep { game, .. } => game.draw(gpu),
+            Engine::Local { game, .. }
+            | Engine::Playback { game, .. }
+            | Engine::Lockstep { game, .. } => game.draw(gpu),
             Engine::Rollback { session } => session.game().draw(gpu),
         }
         gpu.render();
@@ -290,14 +412,18 @@ impl<G: Game> Console<G> {
     /// The game as it should be displayed.
     pub fn game(&self) -> &G {
         match &self.engine {
-            Engine::Local { game, .. } | Engine::Lockstep { game, .. } => game,
+            Engine::Local { game, .. }
+            | Engine::Playback { game, .. }
+            | Engine::Lockstep { game, .. } => game,
             Engine::Rollback { session } => session.game(),
         }
     }
 
     fn apu_mut(&mut self) -> &mut Apu {
         match &mut self.engine {
-            Engine::Local { apu, .. } | Engine::Lockstep { apu, .. } => apu,
+            Engine::Local { apu, .. }
+            | Engine::Playback { apu, .. }
+            | Engine::Lockstep { apu, .. } => apu,
             Engine::Rollback { session } => session.apu_mut(),
         }
     }
@@ -306,7 +432,7 @@ impl<G: Game> Console<G> {
     /// resimulated, confirmed)`. Zeros when not in netplay.
     pub fn net_stats(&self) -> [u32; 7] {
         match &self.engine {
-            Engine::Local { .. } => [0; 7],
+            Engine::Local { .. } | Engine::Playback { .. } => [0; 7],
             Engine::Lockstep { session, .. } => {
                 let s = session.stats();
                 [
@@ -437,6 +563,12 @@ pub const HEIGHT: u32 = SCREEN_H as u32;
 /// | `kagami_net_desync_frame() -> u32` | first disagreeing frame |
 /// | `kagami_net_stat(i: u32) -> u32` | frames, stalls, sent, received, rollbacks, resimulated, confirmed |
 /// | `kagami_confirmed_hash_lo(f)`, `kagami_confirmed_hash_hi(f)` | hash of a confirmed frame, 0 if unknown |
+/// | `kagami_replay_export() -> u32`, `kagami_replay_export_ptr()` | encode the recording so far; its length and bytes |
+/// | `kagami_replay_frames() -> u32` | frames recorded |
+/// | `kagami_replay_import_ptr(len: u32) -> *mut u8` | staging buffer for a replay file |
+/// | `kagami_replay_load() -> u32` | play back the staged replay; its frame count, or `0xFFFF_FFFF` if invalid |
+/// | `kagami_replay_verify() -> u32` | 0 = all checkpoints match, n = first mismatch at frame n-1, `0xFFFF_FFFF` = invalid |
+/// | `kagami_replay_playing() -> u32`, `kagami_replay_len() -> u32` | playback state |
 ///
 /// Pointers are valid until the next `kagami_init`; the framebuffer and
 /// audio buffers are reused across frames, so copy them out after each step.
@@ -604,6 +736,46 @@ macro_rules! cartridge {
             #[no_mangle]
             pub extern "C" fn kagami_confirmed_hash_hi(frame: u32) -> u32 {
                 with(|c| (c.confirmed_hash(frame).unwrap_or(0) >> 32) as u32)
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_export() -> u32 {
+                with(|c| c.export_replay() as u32)
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_export_ptr() -> *const u8 {
+                with(|c| c.export_buf().as_ptr())
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_frames() -> u32 {
+                with(|c| c.recorded_frames())
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_import_ptr(len: u32) -> *mut u8 {
+                with(|c| c.import_buf(len as usize).as_mut_ptr())
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_load() -> u32 {
+                with(|c| c.load_replay().unwrap_or(u32::MAX))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_verify() -> u32 {
+                with(|c| c.verify_replay().unwrap_or(u32::MAX))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_playing() -> u32 {
+                with(|c| u32::from(c.is_playback()))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_len() -> u32 {
+                with(|c| c.playback_len())
             }
         }
     };
@@ -777,6 +949,56 @@ mod tests {
     }
 
     #[test]
+    fn replays_record_export_load_and_verify() {
+        let mut c: Console<Blink> = Console::new(5, 2);
+        for i in 0..70u32 {
+            c.step(u32::from(Input::from_bits((i % 3) as u8).bits()));
+        }
+        assert_eq!(c.recorded_frames(), 70);
+        let n = c.export_replay();
+        assert!(n > 0);
+        let bytes = c.export_buf().to_vec();
+        let decoded = Replay::decode(&bytes).unwrap();
+        assert_eq!(decoded.len(), 70);
+        assert_eq!(decoded.checkpoints.len(), 2);
+        assert_eq!(decoded.verify::<Blink>().unwrap(), c.state_hash());
+
+        // Load it into a fresh console and play it back; inputs are ignored.
+        let mut d: Console<Blink> = Console::new(1, 1);
+        d.import_buf(bytes.len()).copy_from_slice(&bytes);
+        assert_eq!(d.verify_replay(), Some(0));
+        assert_eq!(d.load_replay(), Some(70));
+        assert!(d.is_playback());
+        assert_eq!(d.playback_len(), 70);
+        assert_eq!(d.players(), 2);
+        for _ in 0..80 {
+            d.step(0xFF);
+        }
+        assert_eq!(d.frame(), 70, "playback stops at the end");
+        assert_eq!(d.state_hash(), c.state_hash());
+        // The playback itself was recorded again, identically.
+        d.export_replay();
+        assert_eq!(d.export_buf(), &bytes[..]);
+
+        // Garbage is rejected; a corrupted checkpoint is located.
+        let mut e: Console<Blink> = Console::new(1, 1);
+        e.import_buf(4).copy_from_slice(b"junk");
+        assert_eq!(e.load_replay(), None);
+        assert_eq!(e.verify_replay(), None);
+        assert!(!e.is_playback());
+        let mut bad = decoded.clone();
+        bad.checkpoints[1].1 ^= 1;
+        let bad_bytes = bad.encode();
+        e.import_buf(bad_bytes.len()).copy_from_slice(&bad_bytes);
+        assert_eq!(e.verify_replay(), Some(61));
+        // Netplay and stop reset the recording.
+        c.start_net(0, 2, 1, 0);
+        assert_eq!(c.recorded_frames(), 0);
+        c.stop_net();
+        assert_eq!(c.recorded_frames(), 0);
+    }
+
+    #[test]
     fn staging_buffers_round_trip_datagrams() {
         let mut c: Console<Blink> = Console::new(1, 2);
         c.start_net(0, 2, 1, 0);
@@ -846,5 +1068,16 @@ mod tests {
         assert_eq!(x::kagami_net_status(), 0);
         x::kagami_init(3, 1);
         assert_eq!(x::kagami_frame(), 0);
+        // Replay exports.
+        x::kagami_step(0);
+        x::kagami_step(16);
+        assert_eq!(x::kagami_replay_frames(), 2);
+        let n = x::kagami_replay_export();
+        assert!(n > 0 && !x::kagami_replay_export_ptr().is_null());
+        assert!(!x::kagami_replay_import_ptr(4).is_null());
+        assert_eq!(x::kagami_replay_load(), u32::MAX);
+        assert_eq!(x::kagami_replay_verify(), u32::MAX);
+        assert_eq!(x::kagami_replay_playing(), 0);
+        assert_eq!(x::kagami_replay_len(), 0);
     }
 }
