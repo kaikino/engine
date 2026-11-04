@@ -17,3 +17,6 @@ echo "== web: a replay recorded in Chromium verifies with the native binary"
 target/release/ippon --verify web/dist/browser.kgmr | grep "verify: OK"
 echo "== web: netplay e2e (two pages over WebRTC, lockstep and rollback)"
 node web/test/netplay.mjs
+echo "== web: tile editor exports art the console parses"
+node web/test/tiles.mjs
+cargo run $J -q -p kagami --example art_check -- web/dist/tiles-export.rs

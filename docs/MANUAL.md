@@ -114,6 +114,11 @@ exactly 128 columns wide maps 1:1 onto the tile sheet, which is how
 multi-tile objects find their second row: tile *t*'s lower neighbour is
 *t + 16*.
 
+`web/tools/tiles.html` is a tile editor that paints with the palette and
+exports exactly these constants (and imports them back for editing). Open
+it from any static server; it needs no build. `cargo run -p kagami
+--example art_check -- file.rs` confirms an export parses.
+
 ### 3.2 Color key
 
 One palette index is transparent in tiles and objects. It is index 0 (墨

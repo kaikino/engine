@@ -31,10 +31,12 @@ These are the console. Changing them would make a different console.
 - HANABI, a second cartridge exercising scrolling, raster effects and the sprite budget.
 - Browser netplay over WebRTC with serverless signaling.
 - Gamepads in the browser host.
+- Browser replays, interchangeable with native ones.
+- Tile editor exporting Rust art.
 
 ## v0.2 candidates
 
-1. A tracker and tile editor that write Rust source.
+1. A tracker that writes `Song` source (the tile editor exists).
 2. A native-to-browser bridge transport.
 
 ## How to propose a change

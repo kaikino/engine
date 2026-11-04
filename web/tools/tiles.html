@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAGAMI tile editor</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #1c1c1c; color: #f8f4e6; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  header { padding: 10px 16px; border-bottom: 1px solid #223a70; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  main { display: grid; grid-template-columns: auto 1fr; gap: 16px; padding: 16px; }
+  #sheet { image-rendering: pixelated; background: #000; cursor: crosshair; outline: 2px solid #165e83; touch-action: none; }
+  #palette { display: grid; grid-template-columns: repeat(8, 28px); gap: 4px; margin: 8px 0; }
+  #palette button { width: 28px; height: 28px; border: 2px solid transparent; cursor: pointer; }
+  #palette button.active { border-color: #fffffc; }
+  textarea { width: 100%; min-height: 260px; background: #111; color: #a0d8ef; border: 1px solid #223a70; font: inherit; white-space: pre; }
+  button, select, input { font: inherit; background: #223a70; color: #fffffc; border: 0; padding: 5px 10px; cursor: pointer; }
+  button:hover { background: #165e83; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  .side { max-width: 560px; }
+  .hint { opacity: .7; }
+</style>
+</head>
+<body>
+<header>
+  <b>鏡 tile editor</b>
+  <label>width <input id="w" type="number" min="1" max="16" value="2" size="3"> tiles</label>
+  <label>height <input id="h" type="number" min="1" max="32" value="2" size="3"> tiles</label>
+  <label>zoom <input id="zoom" type="range" min="4" max="24" value="12"></label>
+  <label>tool <select id="tool"><option value="pencil">pencil</option><option value="fill">fill</option><option value="pick">eyedropper</option></select></label>
+  <button id="clear">clear</button>
+  <button id="fliph">flip ↔</button>
+  <button id="flipv">flip ↕</button>
+  <span class="hint">left: paint · right: erase · keys 0-9 pick palette slots</span>
+</header>
+<main>
+  <div>
+    <canvas id="sheet"></canvas>
+    <div id="palette"></div>
+    <div class="hint">slot <b id="slot">1</b> = <b id="slotname">gofun</b> · key char <b id="slotchar">1</b> · <code>.</code> is transparent</div>
+  </div>
+  <div class="side">
+    <p><button id="export">export Rust</button> <button id="import">import from text</button> <button id="copy">copy</button></p>
+    <textarea id="out" spellcheck="false"></textarea>
+    <p class="hint">Paste the constants into your cartridge's <code>art.rs</code> and load with <code>parse_tiles(ART, KEY, &amp;COLORS)</code>. The sheet is 8 × 8 tiles each; a 16-tile-wide sheet maps straight onto tile memory.</p>
+  </div>
+</main>
+<script type="module">
+  const RGB = ['#1c1c1c','#fffffc','#f8f4e6','#949495','#7b7c7d','#165e83','#223a70','#00a3af','#a0d8ef','#eb6101','#c9171e','#b7282e','#fef4f4','#f09199','#f8b500','#ffd900','#c5c56a','#c3d825','#839b5c','#007b43','#aacf53','#bbbcde','#674196','#745399','#762f07','#bf783a','#ed6d3d','#dcd3b2','#965042','#888e7e','#e6b422','#1e50a2'];
+  const NAMES = ['sumi','gofun','zoge','nezumi','namari','ai','kon','asagi','sora','shu','beni','akane','sakura','momo','yamabuki','ki','matcha','wakakusa','matsuba','tokiwa','moegi','fuji','ayame','edomurasaki','kuri','kohaku','kaki','suna','hiwada','rikyunezumi','kin','ruri'];
+  const CONSTS = NAMES.map((n) => n.toUpperCase());
+  // Key characters: '.' = transparent (index 0), then one char per palette index.
+  const KEYCHARS = '.123456789abcdefghijklmnopqrstuv';
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('sheet'), ctx = canvas.getContext('2d');
+  let W = 2, H = 2, zoom = 12, cur = 1;
+  let px = new Uint8Array(W * 8 * H * 8); // palette indices; 0 = transparent
+
+  const resize = (w, h) => {
+    const next = new Uint8Array(w * 8 * h * 8);
+    for (let y = 0; y < Math.min(H, h) * 8; y++) for (let x = 0; x < Math.min(W, w) * 8; x++) next[y * w * 8 + x] = px[y * W * 8 + x];
+    W = w; H = h; px = next; draw();
+  };
+  const draw = () => {
+    canvas.width = W * 8 * zoom; canvas.height = H * 8 * zoom;
+    for (let y = 0; y < H * 8; y++) for (let x = 0; x < W * 8; x++) {
+      const c = px[y * W * 8 + x];
+      ctx.fillStyle = c === 0 ? ((x + y) % 2 ? '#101010' : '#181818') : RGB[c];
+      ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    for (let x = 0; x <= W; x++) { ctx.beginPath(); ctx.moveTo(x * 8 * zoom, 0); ctx.lineTo(x * 8 * zoom, canvas.height); ctx.stroke(); }
+    for (let y = 0; y <= H; y++) { ctx.beginPath(); ctx.moveTo(0, y * 8 * zoom); ctx.lineTo(canvas.width, y * 8 * zoom); ctx.stroke(); }
+  };
+  const setSlot = (i) => {
+    cur = i;
+    $('slot').textContent = i; $('slotname').textContent = i === 0 ? 'transparent' : NAMES[i]; $('slotchar').textContent = KEYCHARS[i];
+    for (const b of $('palette').children) b.classList.toggle('active', Number(b.dataset.i) === i);
+  };
+  for (let i = 0; i < 32; i++) {
+    const b = document.createElement('button');
+    b.dataset.i = i; b.style.background = RGB[i]; b.title = `${i} ${NAMES[i]}`;
+    b.addEventListener('click', () => setSlot(i));
+    $('palette').appendChild(b);
+  }
+  setSlot(1);
+  const at = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return [Math.floor((e.clientX - r.left) / zoom), Math.floor((e.clientY - r.top) / zoom)];
+  };
+  const fill = (x, y, from, to) => {
+    if (from === to) return;
+    const stack = [[x, y]];
+    while (stack.length) {
+      const [cx, cy] = stack.pop();
+      if (cx < 0 || cy < 0 || cx >= W * 8 || cy >= H * 8 || px[cy * W * 8 + cx] !== from) continue;
+      px[cy * W * 8 + cx] = to;
+      stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+    }
+  };
+  let painting = false;
+  const paint = (e) => {
+    const [x, y] = at(e);
+    if (x < 0 || y < 0 || x >= W * 8 || y >= H * 8) return;
+    const color = e.buttons === 2 ? 0 : cur;
+    const tool = $('tool').value;
+    if (tool === 'pick') { setSlot(px[y * W * 8 + x]); return; }
+    if (tool === 'fill') fill(x, y, px[y * W * 8 + x], color); else px[y * W * 8 + x] = color;
+    draw();
+  };
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('pointerdown', (e) => { painting = true; paint(e); });
+  canvas.addEventListener('pointermove', (e) => { if (painting) paint(e); });
+  window.addEventListener('pointerup', () => { painting = false; });
+  window.addEventListener('keydown', (e) => { if (/^[0-9]$/.test(e.key) && document.activeElement.tagName !== 'TEXTAREA') setSlot(Number(e.key)); });
+  $('w').addEventListener('change', () => resize(Number($('w').value), H));
+  $('h').addEventListener('change', () => resize(W, Number($('h').value)));
+  $('zoom').addEventListener('input', () => { zoom = Number($('zoom').value); draw(); });
+  $('clear').addEventListener('click', () => { px.fill(0); draw(); });
+  $('fliph').addEventListener('click', () => { for (let y = 0; y < H * 8; y++) { const row = px.subarray(y * W * 8, (y + 1) * W * 8); row.reverse(); } draw(); });
+  $('flipv').addEventListener('click', () => { const rows = []; for (let y = 0; y < H * 8; y++) rows.push(px.slice(y * W * 8, (y + 1) * W * 8)); rows.reverse().forEach((r, y) => px.set(r, y * W * 8)); draw(); });
+
+  // Export: only the palette slots actually used go into KEY/COLORS.
+  const exportRust = () => {
+    const used = [...new Set(px)].filter((c) => c !== 0).sort((a, b) => a - b);
+    const key = '.' + used.map((c) => KEYCHARS[c]).join('');
+    const colors = ['pal::SUMI', ...used.map((c) => 'pal::' + CONSTS[c])];
+    const lines = [];
+    for (let y = 0; y < H * 8; y++) {
+      let line = '';
+      for (let x = 0; x < W * 8; x++) line += KEYCHARS[px[y * W * 8 + x]];
+      lines.push(line);
+    }
+    return `// ${W}x${H} tiles, generated by web/tools/tiles.html\nconst KEY: &str = "${key}";\nconst COLORS: [u8; ${colors.length}] = [${colors.join(', ')}];\nconst ART: &str = "\n${lines.join('\n')}\n";\n`;
+  };
+  // Import: reads ART lines (and KEY if present) back into the grid.
+  const importRust = (text) => {
+    const keyMatch = text.match(/KEY: &str = "([^"]+)"/);
+    const colorsMatch = text.match(/COLORS: \[u8; \d+\] = \[([^\]]+)\]/);
+    const art = text.match(/ART: &str = "\s*([\s\S]*?)\s*"/);
+    const lines = (art ? art[1] : text).split('\n').map((l) => l.trim()).filter((l) => l.length);
+    if (!lines.length) return false;
+    const w = Math.ceil(lines[0].length / 8), h = Math.ceil(lines.length / 8);
+    let map = (ch) => KEYCHARS.indexOf(ch);
+    if (keyMatch && colorsMatch) {
+      const key = keyMatch[1];
+      const cols = colorsMatch[1].split(',').map((s) => s.trim().replace('pal::', '')).map((n) => Math.max(0, CONSTS.indexOf(n)));
+      map = (ch) => { const i = key.indexOf(ch); return i < 0 ? 0 : (i === 0 ? 0 : cols[i]); };
+    }
+    W = w; H = h; px = new Uint8Array(W * 8 * H * 8);
+    lines.forEach((line, y) => { for (let x = 0; x < line.length; x++) px[y * W * 8 + x] = Math.max(0, map(line[x])); });
+    $('w').value = W; $('h').value = H; draw();
+    return true;
+  };
+  $('export').addEventListener('click', () => { $('out').value = exportRust(); });
+  $('import').addEventListener('click', () => { if (!importRust($('out').value)) alert('no art found'); });
+  $('copy').addEventListener('click', () => navigator.clipboard.writeText($('out').value));
+  draw();
+  window.tiles = { exportRust, importRust, set: (x, y, c) => { px[y * W * 8 + x] = c; draw(); }, get: (x, y) => px[y * W * 8 + x], resize, get size() { return [W, H]; } };
+</script>
+</body>
+</html>

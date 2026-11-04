@@ -164,7 +164,8 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 | `games/ippon` | IPPON, the reference cartridge, with the engine's end-to-end tests. |
 | `games/hanabi` | HANABI, a two-player festival-night shooter that leans on scrolling, line-scroll reflections and the sprite budget. |
 | `games/hello` | The smallest possible cartridge. |
-| `crates/kagami-web` | C ABI over the console for the browser; `web/` holds the JavaScript host and its Playwright test. |
+| `crates/kagami-web` | C ABI over the console for the browser; `web/` holds the JavaScript host and its Playwright tests. |
+| `web/tools/tiles.html` | Tile editor: paint with the 32 pigments, export Rust art constants, import them back. No build step. |
 | `docs/` | [Manual](docs/MANUAL.md) · [Architecture](docs/ARCHITECTURE.md) · [Determinism](docs/DETERMINISM.md) · [Netcode](docs/NETCODE.md) · [Decisions](docs/DECISIONS.md) · [Roadmap](docs/ROADMAP.md) |
 | `scripts/check.sh` | The full quality gate CI runs: fmt, clippy, docs, tests, placeholder scan, release build, headless smoke, replay verify. |
 
