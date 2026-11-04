@@ -20,6 +20,9 @@ compatibility) are marked **[sim]**.
 
 - **Raster effects.** Per-scanline horizontal scroll tables per background (`Background::set_line_scroll`), horizontal window masks (`Background::window`) and a mosaic register (`Gpu::set_mosaic`). IPPON uses a heat haze on its title and a mosaic ramp when a point is called.
 
+- **Save data.** `Game::load_sram` / `Game::save_sram` with a 2 KB budget; the runtime persists `kagami-<title>.sram` for local play (`--sram`, `--no-sram`). IPPON keeps a lifetime win record on its title screen.
+- **Gamepads.** The runtime reads gamepads through `gilrs` (feature `gamepad`, on by default), first pad to player 1, merged with the keyboard; `--no-gamepad` ignores them.
+
 ### Changed
 
 - **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.

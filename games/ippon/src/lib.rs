@@ -191,7 +191,12 @@ pub struct Ippon {
     rng: Rng,
     frame: u32,
     players: u8,
+    /// Lifetime match wins per side, from save data. A per-console record:
+    /// shown on the title screen, never used by `update`, never hashed.
+    record: [u16; 2],
 }
+
+const SRAM_MAGIC: &[u8; 4] = b"IPPN";
 
 impl Ippon {
     /// Current scores.
@@ -207,6 +212,11 @@ impl Ippon {
     /// Both kendoka.
     pub fn fighters(&self) -> &[Fighter; 2] {
         &self.fighters
+    }
+
+    /// Lifetime wins per side from save data.
+    pub fn record(&self) -> [u16; 2] {
+        self.record
     }
 
     fn spawn_petal(rng: &mut Rng, from_top: bool) -> Petal {
@@ -478,7 +488,24 @@ impl Game for Ippon {
             rng,
             frame: 0,
             players: 2,
+            record: [0, 0],
         }
+    }
+
+    fn load_sram(&mut self, data: &[u8]) {
+        if data.len() >= 8 && &data[..4] == SRAM_MAGIC {
+            self.record = [
+                u16::from_le_bytes([data[4], data[5]]),
+                u16::from_le_bytes([data[6], data[7]]),
+            ];
+        }
+    }
+
+    fn save_sram(&self) -> Option<Vec<u8>> {
+        let mut v = SRAM_MAGIC.to_vec();
+        v.extend_from_slice(&self.record[0].to_le_bytes());
+        v.extend_from_slice(&self.record[1].to_le_bytes());
+        Some(v)
     }
 
     fn setup(&self, gpu: &mut Gpu) {
@@ -543,9 +570,10 @@ impl Game for Ippon {
                     let [a, b] = self.score();
                     if a >= IPPON_TO_WIN || b >= IPPON_TO_WIN {
                         ctx.apu.stop_song();
-                        self.phase = Phase::Victory {
-                            winner: u8::from(b > a),
-                        };
+                        let winner = u8::from(b > a);
+                        self.record[winner as usize] =
+                            self.record[winner as usize].saturating_add(1);
+                        self.phase = Phase::Victory { winner };
                     } else {
                         self.reset_round();
                         if !ctx.apu.song_playing() {
@@ -647,6 +675,10 @@ impl Game for Ippon {
                 gpu.text_centered(90, "1P ARROWS Z STRIKE X GUARD", pal::NEZUMI);
                 gpu.text_centered(100, "2P  WASD  J STRIKE K GUARD", pal::NEZUMI);
                 gpu.text_centered(208, "FIRST TO TWO IPPON", pal::KURI);
+                if self.record != [0, 0] {
+                    let rec = format!("RECORD SHIRO {} - {} AKA", self.record[0], self.record[1]);
+                    gpu.text_centered(216, &rec, pal::KURI);
+                }
             }
             Phase::Hajime(t) => {
                 if t > HAJIME_FRAMES / 3 {
@@ -950,6 +982,42 @@ mod tests {
         g.draw(&mut gpu);
         gpu.render();
         assert_eq!(gpu.sprite_count(), PETALS + 2);
+    }
+
+    #[test]
+    fn sram_roundtrip_and_record_is_not_hashed() {
+        let mut g = Ippon::new(1);
+        assert_eq!(g.record(), [0, 0]);
+        g.load_sram(b"junk");
+        assert_eq!(g.record(), [0, 0]);
+        g.load_sram(&[b'I', b'P', b'P', b'N', 3, 0, 300 % 256, 1]);
+        assert_eq!(g.record(), [3, 300]);
+        let saved = g.save_sram().unwrap();
+        let mut h = Ippon::new(1);
+        h.load_sram(&saved);
+        assert_eq!(h.record(), [3, 300]);
+        // The record changes nothing the console hashes.
+        let hash = |x: &Ippon| {
+            let mut s = StateHasher::new();
+            x.hash(&mut s);
+            s.finish()
+        };
+        assert_eq!(hash(&g), hash(&Ippon::new(1)));
+        // Winning a match bumps the winner's tally.
+        let (mut m, mut apu) = fight_ready();
+        for _ in 0..2 {
+            run(&mut m, &mut apu, 1, |_| only(0, Input::A));
+            run(&mut m, &mut apu, WINDUP_FRAMES + 1, |_| {
+                [Input::NONE; MAX_PLAYERS]
+            });
+            run(&mut m, &mut apu, POINT_FRAMES + HAJIME_FRAMES + 2, |_| {
+                [Input::NONE; MAX_PLAYERS]
+            });
+            run(&mut m, &mut apu, 60, |_| only(0, Input::RIGHT));
+        }
+        assert_eq!(m.phase(), Phase::Victory { winner: 0 });
+        assert_eq!(m.record(), [1, 0]);
+        assert!(m.save_sram().unwrap().len() <= kagami::SRAM_SIZE);
     }
 
     #[test]

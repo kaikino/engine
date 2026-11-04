@@ -27,7 +27,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+          sudo apt-get install -y libasound2-dev libudev-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
       - name: Full quality gate
         shell: bash
         run: scripts/check.sh
@@ -54,7 +54,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev xvfb
+          sudo apt-get install -y libasound2-dev libudev-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev xvfb
       - run: cargo build --workspace --release
       - name: Run IPPON for 120 frames in a virtual display
         run: xvfb-run -a target/release/ippon --exit-after 120 --mute
@@ -79,7 +79,7 @@ jobs:
           npx playwright install --with-deps chromium
       - run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+          sudo apt-get install -y libasound2-dev libudev-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
       - name: Build wasm, run headless Chromium, compare hashes with native
         run: NODE_PATH=$PWD/node_modules scripts/check-web.sh
       - uses: actions/upload-artifact@v4
@@ -99,7 +99,7 @@ jobs:
       - uses: taiki-e/install-action@cargo-llvm-cov
       - run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+          sudo apt-get install -y libasound2-dev libudev-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
       - name: Measure line coverage of the console and runtime
         run: |
           cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info \

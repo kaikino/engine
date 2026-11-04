@@ -96,6 +96,14 @@ on Linux, macOS and Windows. A platform-dependent bug cannot pass CI. The
 cost is that intentional simulation changes must update the constant, which
 is a feature: it forces the changelog entry.
 
+## D15. Save data is a record, not state
+
+SRAM contents differ between consoles, so anything loaded from it must not
+reach `update` or `hash`; otherwise two consoles with different saves would
+desync on frame 0 and replays would not verify. The trait documentation
+says so, the runtime refuses to load saves under netplay or replay
+playback, and IPPON's tests assert its record leaves the hash untouched.
+
 ## D14. The browser runtime is a C ABI plus plain JavaScript
 
 `winit`, `softbuffer` and `cpal` support `wasm32`, but routing the browser

@@ -22,6 +22,9 @@ PLAY (default):
   --record FILE        save the match as a replay when the window closes
   --replay FILE        play back a replay instead of reading the keyboard
   --exit-after N       close the window after N frames (for smoke tests)
+  --sram FILE          save file (default: kagami-<title>.sram in the working dir)
+  --no-sram            do not load or save cartridge save data
+  --no-gamepad         ignore gamepads
 
 NETPLAY:
   --netplay udp --player I --bind ADDR --peer ADDR[,ADDR...]
@@ -118,6 +121,12 @@ pub struct Options {
     pub netplay: Option<NetplayTransport>,
     /// Close the window after this many frames.
     pub exit_after: Option<u32>,
+    /// Save file path override.
+    pub sram: Option<String>,
+    /// Disable save data entirely.
+    pub no_sram: bool,
+    /// Ignore gamepads.
+    pub no_gamepad: bool,
 }
 
 impl Options {
@@ -143,6 +152,9 @@ impl Default for Options {
             replay: None,
             netplay: None,
             exit_after: None,
+            sram: None,
+            no_sram: false,
+            no_gamepad: false,
         }
     }
 }
@@ -221,6 +233,9 @@ pub fn parse_args(args: &[String]) -> Result<Options, UsageError> {
             "--replay" => o.replay = Some(next(&mut i, a)?),
             "--seed" => o.seed = parse_num(a, &next(&mut i, a)?)?,
             "--exit-after" => o.exit_after = Some(parse_num(a, &next(&mut i, a)?)?),
+            "--sram" => o.sram = Some(next(&mut i, a)?),
+            "--no-sram" => o.no_sram = true,
+            "--no-gamepad" => o.no_gamepad = true,
             "--players" => {
                 let p: u8 = parse_num(a, &next(&mut i, a)?)?;
                 if p == 0 || p as usize > MAX_PLAYERS {
@@ -370,6 +385,10 @@ mod tests {
         ));
         assert_eq!(o.record.as_deref(), Some("r.kgmr"));
         assert_eq!(o.exit_after, Some(10));
+        let s = p("--sram saves/x.sram --no-gamepad").unwrap();
+        assert_eq!(s.sram.as_deref(), Some("saves/x.sram"));
+        assert!(s.no_gamepad && !s.no_sram);
+        assert!(p("--no-sram").unwrap().no_sram);
     }
 
     #[test]

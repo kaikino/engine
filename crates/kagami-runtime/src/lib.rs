@@ -26,6 +26,7 @@
 
 mod audio;
 mod cli;
+mod gamepad;
 mod headless;
 mod keys;
 mod session;
@@ -33,9 +34,11 @@ mod window;
 
 pub use audio::{AudioOutput, Resampler, SampleQueue};
 pub use cli::{parse_args, Mode, NetplayTransport, Options, UsageError, USAGE};
+pub use gamepad::{axis_to_dpad, PadState};
 pub use headless::{run_headless, HeadlessReport, RandomInputs};
 pub use keys::{Controllers, KeyMap};
 pub use session::{NetStats, Session, SessionEvent};
+pub use window::default_sram_path;
 
 use kagami::Game;
 use std::process::ExitCode;
@@ -118,6 +121,16 @@ mod tests {
 
     fn args(s: &str) -> Vec<String> {
         s.split_whitespace().map(str::to_string).collect()
+    }
+
+    #[test]
+    fn sram_paths_are_slugs() {
+        assert_eq!(default_sram_path("IPPON"), "kagami-ippon.sram");
+        assert_eq!(
+            default_sram_path("Hello, World!"),
+            "kagami-hello--world.sram"
+        );
+        assert_eq!(default_sram_path("鏡"), "kagami-.sram");
     }
 
     #[test]

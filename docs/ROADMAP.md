@@ -18,10 +18,8 @@ These are the console. Changing them would make a different console.
 |---|---|---|
 | **Browser netplay** | The wasm build runs locally; netplay in a browser needs a WebRTC data-channel `Transport` and a signaling server. | `kagami-web` + a small signaling service |
 | **Cartridge loader** | Games are compiled in. Loading a cartridge at runtime means a sandbox (wasm modules are the obvious one). | `kagami-cart` crate |
-| **Gamepads** | Keyboard only. `gilrs` is the likely dependency. | `kagami-runtime::keys` |
 | **Kanji in the system font** | Katakana is in. Kanji at 8 × 8 is a different project (and a different font size). | `kagami::gpu::font` |
 | **Relay server / NAT traversal** | Out of the console's scope; a relay is a `Transport`. | separate project |
-| **Save data** | Cartridges have no persistent storage. A 2 KB battery-backed "SRAM" API is the natural shape. | `kagami::sram` |
 
 ## Done since v0.1.0
 
@@ -29,12 +27,13 @@ These are the console. Changing them would make a different console.
 - Browser runtime (`kagami-web`, `web/`), hash-checked against native in CI.
 - Katakana in the system font.
 - Raster effects: per-line scroll, window masks, mosaic.
+- Save data (2 KB SRAM per cartridge) and gamepads.
 
 ## v0.2 candidates
 
 1. WebRTC transport for browser netplay.
-2. Gamepad support.
-3. Save data (SRAM).
+2. A second cartridge that exercises scrolling backgrounds and the sprite budget.
+3. Gamepads in the browser host.
 
 ## How to propose a change
 

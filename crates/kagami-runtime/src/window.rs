@@ -3,6 +3,8 @@
 
 use crate::audio::{AudioOutput, SampleQueue};
 use crate::cli::{NetplayTransport, Options};
+#[cfg(feature = "gamepad")]
+use crate::gamepad::Gamepads;
 use crate::keys::{Controllers, KeyMap};
 use crate::session::{Session, SessionEvent};
 use kagami::apu::SAMPLES_PER_FRAME;
@@ -29,6 +31,9 @@ struct App<G: Game> {
     gpu: Gpu,
     keymap: KeyMap,
     controllers: Controllers,
+    #[cfg(feature = "gamepad")]
+    gamepads: Option<Gamepads>,
+    sram_path: Option<String>,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     last: Instant,
@@ -52,7 +57,14 @@ struct App<G: Game> {
 
 impl<G: Game> App<G> {
     fn simulate(&mut self) {
-        let inputs = self.controllers.all();
+        let mut inputs = self.controllers.all();
+        #[cfg(feature = "gamepad")]
+        if let Some(pads) = &mut self.gamepads {
+            pads.poll();
+            for (p, slot) in inputs.iter_mut().enumerate() {
+                *slot |= pads.input(p);
+            }
+        }
         match self.session.tick(inputs) {
             SessionEvent::Advanced(_) => self.waiting_on.clear(),
             SessionEvent::Waiting(w) => self.waiting_on = w,
@@ -291,6 +303,23 @@ impl<G: Game> ApplicationHandler for App<G> {
     }
 }
 
+/// The default save file for a cartridge: `kagami-<title>.sram` in the
+/// working directory, with the title lower-cased and non-alphanumerics
+/// replaced by dashes.
+pub fn default_sram_path(title: &str) -> String {
+    let slug: String = title
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    format!("kagami-{}.sram", slug.trim_matches('-'))
+}
+
 /// Opens a window and plays until it closes.
 ///
 /// # Errors
@@ -301,10 +330,12 @@ pub fn run<G: Game + 'static>(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let seed = opts.seed;
     let probe = G::new(seed);
-    let title = format!("KAGAMI - {}", probe.title());
+    let title = probe.title().to_string();
+    let window_title = format!("KAGAMI - {title}");
     let default_players = probe.default_players();
     drop(probe);
 
+    let mut sram_path: Option<String> = None;
     let session: Session<G> = match &opts.netplay {
         None => {
             let source = match &opts.replay {
@@ -317,7 +348,28 @@ pub fn run<G: Game + 'static>(
                 .map(|r| r.players)
                 .or(opts.players)
                 .unwrap_or(default_players);
-            Session::local(seed, players, source)
+            let replaying = source.is_some();
+            let mut session = Session::local(seed, players, source);
+            if !replaying && !opts.no_sram {
+                let path = opts
+                    .sram
+                    .clone()
+                    .unwrap_or_else(|| default_sram_path(&title));
+                match std::fs::read(&path) {
+                    Ok(data) => {
+                        session.load_sram(&data[..data.len().min(kagami::SRAM_SIZE)]);
+                        writeln!(
+                            out,
+                            "sram: loaded {} bytes from {path}",
+                            data.len().min(kagami::SRAM_SIZE)
+                        )?;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => writeln!(out, "sram: could not read {path}: {e}")?,
+                }
+                sram_path = Some(path);
+            }
+            session
         }
         Some(NetplayTransport::Loopback {
             latency,
@@ -411,12 +463,19 @@ pub fn run<G: Game + 'static>(
         gpu,
         keymap: KeyMap::default(),
         controllers: Controllers::default(),
+        #[cfg(feature = "gamepad")]
+        gamepads: if opts.no_gamepad {
+            None
+        } else {
+            Gamepads::open()
+        },
+        sram_path,
         window: None,
         surface: None,
         last: now,
         accumulator: Duration::ZERO,
         scale: opts.scale,
-        title,
+        title: window_title,
         show_stats: false,
         muted: false,
         audio,
@@ -438,6 +497,13 @@ pub fn run<G: Game + 'static>(
 
     if let Some(path) = app.record.take() {
         app.save_replay(&path);
+    }
+    if let (Some(path), Some(data)) = (&app.sram_path, app.session.game().save_sram()) {
+        let data = &data[..data.len().min(kagami::SRAM_SIZE)];
+        match std::fs::write(path, data) {
+            Ok(()) => writeln!(out, "sram: saved {} bytes to {path}", data.len())?,
+            Err(e) => writeln!(out, "sram: could not write {path}: {e}")?,
+        }
     }
     for m in &app.messages {
         writeln!(out, "{m}")?;

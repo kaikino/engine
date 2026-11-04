@@ -11,6 +11,9 @@ pub const MAX_PLAYERS: usize = 4;
 /// Simulation and display rate in frames per second.
 pub const TICK_RATE: u32 = 60;
 
+/// Size of a cartridge's battery-backed save memory in bytes.
+pub const SRAM_SIZE: usize = 2048;
+
 /// Everything a cartridge may read or trigger during one simulation step.
 ///
 /// Sound is triggered from `update`, not `draw`, so it is part of the
@@ -93,6 +96,22 @@ pub trait Game: Clone {
     fn default_players(&self) -> u8 {
         1
     }
+
+    /// Receives this console's saved data (at most [`SRAM_SIZE`] bytes) once,
+    /// after `new` and before the first `update`. Only called for local play:
+    /// never under netplay or replay playback.
+    ///
+    /// Saved data is a *per-console record* (high scores, win tallies,
+    /// settings), not match state. It must not influence `update` and must
+    /// not be fed to `hash`, or replays and netplay would diverge between
+    /// consoles with different saves.
+    fn load_sram(&mut self, _data: &[u8]) {}
+
+    /// Returns the bytes to persist when the match ends, or `None` to leave
+    /// the save untouched. Anything past [`SRAM_SIZE`] bytes is dropped.
+    fn save_sram(&self) -> Option<Vec<u8>> {
+        None
+    }
 }
 
 /// Runs a game headlessly for `frames` frames, feeding `inputs(frame)` each
@@ -157,6 +176,8 @@ mod tests {
         assert_eq!(a.n, 6);
         assert!(a.title().contains("Counter"));
         assert_eq!(a.default_players(), 1);
+        a.load_sram(&[1, 2, 3]);
+        assert_eq!(a.save_sram(), None);
     }
 
     #[test]

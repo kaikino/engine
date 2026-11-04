@@ -219,6 +219,17 @@ impl<G: Game> Session<G> {
         }
     }
 
+    /// Hands saved data to the game. Only local (non-replay) sessions accept
+    /// it; others ignore the call, since saves must not influence netplay.
+    pub fn load_sram(&mut self, data: &[u8]) {
+        if let Kind::Local {
+            game, source: None, ..
+        } = &mut self.kind
+        {
+            game.load_sram(data);
+        }
+    }
+
     /// Number of players in the match.
     pub fn players(&self) -> u8 {
         self.players
@@ -558,6 +569,36 @@ mod tests {
             s.game().0,
             s.replay().verify::<Count>().map(|_| s.game().0).unwrap()
         );
+    }
+
+    #[test]
+    fn sram_only_reaches_local_games() {
+        #[derive(Clone)]
+        struct Saver(u32);
+        impl Game for Saver {
+            fn new(_: u32) -> Self {
+                Saver(0)
+            }
+            fn update(&mut self, _: &mut UpdateCtx) {}
+            fn draw(&self, _: &mut Gpu) {}
+            fn hash(&self, _: &mut StateHasher) {}
+            fn load_sram(&mut self, d: &[u8]) {
+                self.0 = u32::from(d.first().copied().unwrap_or(0));
+            }
+            fn save_sram(&self) -> Option<Vec<u8>> {
+                Some(vec![self.0 as u8])
+            }
+        }
+        let mut local: Session<Saver> = Session::local(1, 1, None);
+        local.load_sram(&[7]);
+        assert_eq!(local.game().0, 7);
+        assert_eq!(local.game().save_sram(), Some(vec![7]));
+        let mut replaying: Session<Saver> = Session::local(1, 1, Some(Replay::new(1, 1)));
+        replaying.load_sram(&[7]);
+        assert_eq!(replaying.game().0, 0);
+        let mut net: Session<Saver> = Session::loopback(1, 1, 0, 0, 0);
+        net.load_sram(&[7]);
+        assert_eq!(net.game().0, 0);
     }
 
     #[test]

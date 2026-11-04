@@ -323,6 +323,24 @@ per frame, plus a state hash every 60 frames. `--record` writes one,
 is how you prove a build has not changed the simulation. `docs/replays/demo.kgmr`
 is such a proof and CI runs it.
 
+## 9.1 Save data
+
+Each console keeps 2 KB of battery-backed memory per cartridge. Implement
+`load_sram` and `save_sram` on your game; the runtime reads
+`kagami-<title>.sram` before the first frame of a local match and writes it
+when the window closes (`--sram FILE` to choose the file, `--no-sram` to
+disable). Saves are a per-console record (tallies, high scores, settings):
+never let them influence `update` and never hash them, because other
+consoles have different saves. Netplay and replay playback do not load
+saves at all.
+
+## 9.2 Gamepads
+
+Any gamepad the operating system recognises works: the first one connected
+is player 1, the second player 2, and so on, alongside the keyboard. South
+is A, East is B, West/North is C, Start or Select is START, and the d-pad or
+left stick moves. `--no-gamepad` ignores them.
+
 ## 10. Care and handling
 
 The limits in §1 are not configuration. The sprite-per-line limit, the

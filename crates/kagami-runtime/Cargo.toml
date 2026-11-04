@@ -16,12 +16,15 @@ kagami = { workspace = true }
 winit = { version = "0.30", default-features = false, features = ["rwh_06", "x11", "wayland"] }
 softbuffer = { version = "0.4", default-features = false, features = ["x11", "wayland"] }
 cpal = { version = "0.18", optional = true }
+gilrs = { version = "0.11", optional = true }
 
 [features]
-default = ["audio"]
+default = ["audio", "gamepad"]
 ## Play sound through the system audio device. Disable for silent builds
 ## on machines without an audio stack.
 audio = ["dep:cpal"]
+## Read gamepads (first pad is player 1, second is player 2, and so on).
+gamepad = ["dep:gilrs"]
 
 [lints]
 workspace = true

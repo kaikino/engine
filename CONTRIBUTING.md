@@ -7,7 +7,7 @@ Thanks for helping build a console.
 ```bash
 rustup toolchain install stable --component rustfmt clippy
 # Linux only: system libraries for the window and audio
-sudo apt-get install libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+sudo apt-get install libasound2-dev libudev-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
 git clone https://github.com/kaikino/engine kagami && cd kagami
 scripts/check.sh
 ```

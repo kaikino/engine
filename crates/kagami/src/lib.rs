@@ -64,7 +64,7 @@ pub mod rng;
 
 pub use apu::{Apu, Sfx, SfxStep, Song, Waveform};
 pub use fx::{Fx, Vec2};
-pub use game::{Game, UpdateCtx, MAX_PLAYERS, TICK_RATE};
+pub use game::{Game, UpdateCtx, MAX_PLAYERS, SRAM_SIZE, TICK_RATE};
 pub use gpu::palette;
 pub use gpu::{Gpu, Sprite, SCREEN_H, SCREEN_W};
 pub use hash::StateHasher;
