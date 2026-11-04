@@ -283,6 +283,7 @@ mod tests {
     use super::*;
     use crate::gpu::Gpu;
 
+    #[derive(Clone)]
     struct Acc {
         v: u32,
     }

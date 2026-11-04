@@ -4,6 +4,7 @@
 //!
 //! ```no_run
 //! use kagami::{Apu, Game, Gpu, StateHasher, UpdateCtx};
+//! #[derive(Clone)]
 //! struct MyGame;
 //! impl Game for MyGame {
 //!     fn new(_seed: u32) -> Self { MyGame }
@@ -34,7 +35,7 @@ pub use audio::{AudioOutput, Resampler, SampleQueue};
 pub use cli::{parse_args, Mode, NetplayTransport, Options, UsageError, USAGE};
 pub use headless::{run_headless, HeadlessReport, RandomInputs};
 pub use keys::{Controllers, KeyMap};
-pub use session::{Session, SessionEvent};
+pub use session::{NetStats, Session, SessionEvent};
 
 use kagami::Game;
 use std::process::ExitCode;
@@ -98,6 +99,7 @@ mod tests {
     use super::*;
     use kagami::{Gpu, StateHasher, UpdateCtx};
 
+    #[derive(Clone)]
     struct Tick(u32);
     impl Game for Tick {
         fn new(seed: u32) -> Self {

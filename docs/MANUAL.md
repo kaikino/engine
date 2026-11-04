@@ -245,7 +245,9 @@ PLAY (default):
   --seed S           match seed (default 1)
   --scale N          window scale 1..=8 (default 3)
   --mute             no audio
-  --delay D          netplay input delay in frames (default 3)
+  --delay D          netplay input delay in frames (default 3, or 1 with --rollback)
+  --rollback         predict remote inputs and correct later instead of waiting
+  --prediction N     rollback window in frames (default 8)
   --record FILE      save the match as a replay when the window closes
   --replay FILE      play a replay instead of reading the keyboard
   --exit-after N     close the window after N frames
@@ -269,8 +271,9 @@ Every console runs the same game on the same inputs. An input pressed on
 frame *f* takes effect on frame *f + delay* on every console. If a remote
 input has not arrived, the console shows WAITING and holds the frame until
 it does. Every 30 frames the consoles exchange state hashes; a mismatch
-ends the match with a DESYNC message naming the frame. See
-[NETCODE.md](NETCODE.md).
+ends the match with a DESYNC message naming the frame. Add `--rollback`
+and the console instead predicts late inputs and corrects itself when they
+arrive, with an input delay of one frame. See [NETCODE.md](NETCODE.md).
 
 To play over a LAN, each player runs the cartridge with their own
 `--player` index, a `--bind` port, and the other players' addresses in

@@ -6,7 +6,7 @@ use crate::cli::{NetplayTransport, Options};
 use crate::keys::{Controllers, KeyMap};
 use crate::session::{Session, SessionEvent};
 use kagami::apu::SAMPLES_PER_FRAME;
-use kagami::net::{LockstepConfig, UdpTransport};
+use kagami::net::{LockstepConfig, RollbackConfig, UdpTransport};
 use kagami::replay::Replay;
 use kagami::{palette, Game, Gpu, SCREEN_H, SCREEN_W};
 use std::num::NonZeroU32;
@@ -91,6 +91,13 @@ impl<G: Game> App<G> {
                 palette::KI,
             );
             let line2 = match self.session.stats() {
+                Some(s) if self.session.is_rollback() => format!(
+                    "RB {} RESIM {} STALL {} AHEAD {}",
+                    s.rollbacks,
+                    s.resimulated,
+                    s.stalls,
+                    s.frames.saturating_sub(s.confirmed)
+                ),
                 Some(s) => format!(
                     "STALL {} TX {} RX {} REJ {}",
                     s.stalls, s.sent, s.received, s.rejected
@@ -316,7 +323,25 @@ pub fn run<G: Game + 'static>(
             latency,
             jitter,
             loss_permille,
-        }) => Session::loopback(seed, opts.delay, *latency, *jitter, *loss_permille),
+        }) if opts.rollback => Session::rollback_loopback(
+            seed,
+            opts.effective_delay(),
+            opts.prediction,
+            *latency,
+            *jitter,
+            *loss_permille,
+        ),
+        Some(NetplayTransport::Loopback {
+            latency,
+            jitter,
+            loss_permille,
+        }) => Session::loopback(
+            seed,
+            opts.effective_delay(),
+            *latency,
+            *jitter,
+            *loss_permille,
+        ),
         Some(NetplayTransport::Udp {
             player,
             bind,
@@ -335,18 +360,34 @@ pub fn run<G: Game + 'static>(
             let transport = UdpTransport::bind(bind.as_str(), &by_index)?;
             writeln!(
                 out,
-                "netplay: player {} of {} on {}",
+                "netplay ({}): player {} of {} on {}",
+                if opts.rollback {
+                    "rollback"
+                } else {
+                    "lockstep"
+                },
                 player + 1,
                 players,
                 transport.local_addr()?
             )?;
-            let cfg = LockstepConfig {
-                local_player: *player,
-                players,
-                input_delay: opts.delay,
-                ..LockstepConfig::default()
-            };
-            Session::udp(seed, cfg, transport)
+            if opts.rollback {
+                let cfg = RollbackConfig {
+                    local_player: *player,
+                    players,
+                    input_delay: opts.effective_delay(),
+                    max_prediction: opts.prediction,
+                    ..RollbackConfig::default()
+                };
+                Session::rollback_udp(seed, cfg, transport)
+            } else {
+                let cfg = LockstepConfig {
+                    local_player: *player,
+                    players,
+                    input_delay: opts.effective_delay(),
+                    ..LockstepConfig::default()
+                };
+                Session::udp(seed, cfg, transport)
+            }
         }
     };
 
@@ -404,11 +445,19 @@ pub fn run<G: Game + 'static>(
     writeln!(out, "frames: {}", app.session.frame())?;
     writeln!(out, "state hash: {:016x}", app.session.state_hash())?;
     if let Some(s) = app.session.stats() {
-        writeln!(
-            out,
-            "lockstep: {} stalls, {} sent, {} received",
-            s.stalls, s.sent, s.received
-        )?;
+        if app.session.is_rollback() {
+            writeln!(
+                out,
+                "rollback: {} rollbacks, {} frames re-simulated, {} stalls, {} sent, {} received",
+                s.rollbacks, s.resimulated, s.stalls, s.sent, s.received
+            )?;
+        } else {
+            writeln!(
+                out,
+                "lockstep: {} stalls, {} sent, {} received",
+                s.stalls, s.sent, s.received
+            )?;
+        }
     }
     match app.error {
         Some(e) => Err(e.into()),

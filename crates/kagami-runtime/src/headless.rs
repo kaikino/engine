@@ -191,6 +191,7 @@ mod tests {
     use super::*;
     use kagami::{StateHasher, UpdateCtx};
 
+    #[derive(Clone)]
     struct Dots {
         v: u32,
     }

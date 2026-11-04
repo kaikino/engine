@@ -26,6 +26,7 @@
 //! ```
 //! use kagami::{Apu, Game, Gpu, Input, StateHasher, UpdateCtx, MAX_PLAYERS};
 //!
+//! #[derive(Clone)]
 //! struct Pong { x: i32 }
 //!
 //! impl Game for Pong {

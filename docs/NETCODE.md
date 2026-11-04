@@ -1,8 +1,10 @@
 # Netcode
 
-KAGAMI uses **input-delay lockstep**. It is the simplest netcode that is
-fully correct, and because the console is deterministic, it needs no
-state synchronization at all.
+KAGAMI ships two netcodes on one wire format. **Input-delay lockstep** is
+the simplest netcode that is fully correct. **Rollback** predicts and
+corrects, trading a game-state copy per frame for near-zero input delay.
+Both work because the console is deterministic: nothing but inputs and
+hashes ever crosses the network. Pick with `--rollback`.
 
 ## The protocol
 
@@ -56,11 +58,49 @@ Set `hash_interval` to 0 to disable (not recommended).
 Writing a transport for WebRTC, a relay server, or a serial cable is
 implementing those two methods.
 
-## What lockstep does not do
+## Rollback
 
-- **Rollback.** When a remote input is late, lockstep waits. Rollback would predict and correct instead. KAGAMI's `Game` trait would need a save/restore method for that; see the roadmap.
+`kagami::net::Rollback` owns the game (which is why `Game: Clone`). Each
+tick it:
+
+1. Drains the transport.
+2. **Reconciles:** walks the not-yet-confirmed frames in order; at the first
+   frame whose real remote inputs differ from the ones it simulated with, it
+   restores the snapshot taken before that frame and re-simulates up to the
+   present. Re-simulated frames use a scratch sound processor so effects do
+   not fire twice.
+3. **Confirms:** advances the confirmed frame while every player's input is
+   known, hands those frames (with their state hashes) to the caller for the
+   replay, and exchanges hashes on checkpoint frames. Hashes are only ever
+   compared on confirmed frames, so predictions never cause false desyncs.
+4. **Simulates one more frame** using real inputs where known and, for
+   anyone late, their most recent input (people mostly keep doing what they
+   were doing). If it is already `max_prediction` frames ahead of the
+   confirmed frame it stalls instead.
+
+Defaults: input delay 1, prediction window 8 frames (about 130 ms of
+one-way latency before any stall), hashes every 30 confirmed frames,
+12 inputs of redundancy per message.
+
+What you see on screen is the predicted present; a wrong prediction shows
+as a small correction a few frames later. The replay recorded under
+rollback contains only confirmed frames and verifies like any other.
+
+Try it against lockstep on the same simulated link:
+
+```bash
+cargo run --release -p ippon -- --netplay loopback --latency 6 --jitter 3 --loss 100
+cargo run --release -p ippon -- --netplay loopback --latency 6 --jitter 3 --loss 100 --rollback
+```
+
+The first stalls constantly; the second plays smoothly and the F1 overlay
+counts the rollbacks (`RB`), re-simulated frames (`RESIM`) and how far
+ahead of confirmation it is running (`AHEAD`).
+
+## What neither netcode does
+
 - **Matchmaking, NAT traversal, relays.** Peers need to reach each other's UDP port. On a LAN that just works; across the internet you need port forwarding or a relay.
-- **Hiding bad connections.** A 200 ms link needs a delay of ~13 frames to run stall-free. That is honest; rollback would hide it with teleporting.
+- **Hiding bad connections.** On a 200 ms link, lockstep needs a delay of ~13 frames to run stall-free, and rollback needs a prediction window that large, which means visible corrections. Neither can make a bad link feel good.
 - **Cheating prevention.** Every peer sees every input. A modified client can only hurt itself (it will desync).
 
 ## Reading the stats overlay

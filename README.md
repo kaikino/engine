@@ -35,7 +35,7 @@ They are what makes lockstep determinism practical, and they are permanent.
 | **Sound** | 4 channels: two pulse, one triangle, one noise; tracker-style songs |
 | **Controller** | d-pad plus A, B, C, START; up to 4 players |
 | **Math** | 16.16 fixed point only. **Floats are a compile error** in simulation code. |
-| **Netplay** | input-delay lockstep over UDP, hash-checked every N frames |
+| **Netplay** | input-delay lockstep *or* rollback over UDP, hash-checked every N frames |
 | **Replays** | one byte per player per frame, self-verifying |
 
 Everything above lives in the `kagami` crate, which has **zero dependencies**.
@@ -58,6 +58,9 @@ Things to try next:
 ```bash
 # Play yourself over a simulated lossy network: two lockstep peers in one window.
 cargo run --release -p ippon -- --netplay loopback --latency 5 --jitter 3 --loss 100
+
+# Same link with rollback: no stalls, one frame of input delay, corrections instead.
+cargo run --release -p ippon -- --netplay loopback --latency 5 --jitter 3 --loss 100 --rollback
 
 # Record a match (F4 also saves one mid-game), then prove it replays bit-for-bit.
 cargo run --release -p ippon -- --record match.kgmr
@@ -144,8 +147,7 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 
 v0.1.0 is the first release. It is a complete console you can ship a game on
 today, with these deliberate limits: games are compiled in (no cartridge
-loader), netplay is pure input-delay lockstep (no rollback), and the runtime
-is native only. The [roadmap](docs/ROADMAP.md) explains what comes next and,
+loader) and the runtime is native only. The [roadmap](docs/ROADMAP.md) explains what comes next and,
 just as importantly, what will never change.
 
 ## License

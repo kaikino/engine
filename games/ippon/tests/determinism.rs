@@ -188,3 +188,56 @@ fn one_player_mode_lets_the_cpu_win_or_lose() {
     }
     panic!("CPU never scored: {:?}", g.fighters());
 }
+
+#[test]
+fn rollback_peers_across_a_laggy_network_confirm_identical_matches() {
+    use kagami::net::{Rollback, RollbackConfig};
+    let net = LoopbackNetwork::new(2, 11, 5, 3, 100);
+    let cfg = |p| RollbackConfig {
+        local_player: p,
+        players: 2,
+        input_delay: 1,
+        max_prediction: 8,
+        hash_interval: 20,
+        ..RollbackConfig::default()
+    };
+    let mut sessions = [
+        Rollback::new(cfg(0), Ippon::new(SEED)),
+        Rollback::new(cfg(1), Ippon::new(SEED)),
+    ];
+    let mut endpoints = [net.endpoint(0), net.endpoint(1)];
+    let mut inputs = random_inputs();
+    let mut confirmed: [Vec<(u32, [Input; MAX_PLAYERS], u64)>; 2] = [Vec::new(), Vec::new()];
+    let mut ticks = 0;
+    while confirmed.iter().any(|c| c.len() < FRAMES as usize) && ticks < FRAMES * 40 {
+        let frame_inputs = inputs(ticks);
+        for p in 0..2 {
+            let r = sessions[p].step(frame_inputs[p], &mut endpoints[p]);
+            assert!(!matches!(r, StepResult::Desynced(_)), "{r:?}");
+            confirmed[p].extend(sessions[p].drain_confirmed());
+        }
+        net.tick();
+        ticks += 1;
+    }
+    let n = FRAMES as usize;
+    assert!(confirmed[0].len() >= n && confirmed[1].len() >= n);
+    assert_eq!(
+        &confirmed[0][..n],
+        &confirmed[1][..n],
+        "confirmed inputs and hashes agree"
+    );
+    let st = sessions[0].stats();
+    assert!(
+        st.rollbacks > 0,
+        "a laggy network must have forced rollbacks: {st:?}"
+    );
+    // The confirmed timeline is a normal replay that any build can verify.
+    let mut replay = Replay::new(SEED, 2);
+    for (f, i, h) in &confirmed[0][..n] {
+        replay.push(*i);
+        if f % 60 == 0 {
+            replay.checkpoint(*f, *h);
+        }
+    }
+    assert_eq!(replay.verify::<Ippon>().unwrap(), confirmed[0][n - 1].2);
+}

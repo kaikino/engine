@@ -8,6 +8,7 @@
 
 use kagami::{palette, Game, Gpu, StateHasher, UpdateCtx};
 
+#[derive(Clone)]
 struct Hello {
     x: i32,
     y: i32,

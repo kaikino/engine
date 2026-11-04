@@ -394,6 +394,7 @@ mod tests {
     use crate::net::LoopbackNetwork;
 
     /// A game whose state is the sum of all inputs ever seen, per player.
+    #[derive(Clone)]
     struct Sum {
         totals: [u32; MAX_PLAYERS],
         frames: u32,

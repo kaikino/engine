@@ -16,7 +16,9 @@ PLAY (default):
   --seed S             match seed (default: 1)
   --scale N            window scale factor 1..=8 (default: 3)
   --mute               no audio
-  --delay D            input delay in frames for netplay (default: 3)
+  --delay D            netplay input delay in frames (default: 3 lockstep, 1 rollback)
+  --rollback           netplay with rollback: predict remote inputs, correct later
+  --prediction N       rollback: max frames to run ahead of confirmed input (default: 8)
   --record FILE        save the match as a replay when the window closes
   --replay FILE        play back a replay instead of reading the keyboard
   --exit-after N       close the window after N frames (for smoke tests)
@@ -102,8 +104,12 @@ pub struct Options {
     pub scale: u32,
     /// Disable audio.
     pub mute: bool,
-    /// Netplay input delay.
-    pub delay: u8,
+    /// Netplay input delay, if given (defaults depend on the netcode).
+    pub delay: Option<u8>,
+    /// Use rollback instead of lockstep for netplay.
+    pub rollback: bool,
+    /// Rollback prediction window in frames.
+    pub prediction: u8,
     /// Replay to save.
     pub record: Option<String>,
     /// Replay to play.
@@ -114,6 +120,14 @@ pub struct Options {
     pub exit_after: Option<u32>,
 }
 
+impl Options {
+    /// The input delay to use: the explicit `--delay`, else 1 for rollback
+    /// and 3 for lockstep.
+    pub fn effective_delay(&self) -> u8 {
+        self.delay.unwrap_or(if self.rollback { 1 } else { 3 })
+    }
+}
+
 impl Default for Options {
     fn default() -> Self {
         Options {
@@ -122,7 +136,9 @@ impl Default for Options {
             seed: 1,
             scale: 3,
             mute: false,
-            delay: 3,
+            delay: None,
+            rollback: false,
+            prediction: 8,
             record: None,
             replay: None,
             netplay: None,
@@ -224,7 +240,15 @@ pub fn parse_args(args: &[String]) -> Result<Options, UsageError> {
                 if d > 32 {
                     return Err(UsageError::BadValue(a.to_string(), d.to_string()));
                 }
-                o.delay = d;
+                o.delay = Some(d);
+            }
+            "--rollback" => o.rollback = true,
+            "--prediction" => {
+                let n: u8 = parse_num(a, &next(&mut i, a)?)?;
+                if !(1..=32).contains(&n) {
+                    return Err(UsageError::BadValue(a.to_string(), n.to_string()));
+                }
+                o.prediction = n;
             }
             "--netplay" => netplay_kind = Some(next(&mut i, a)?),
             "--player" => player = parse_num(a, &next(&mut i, a)?)?,
@@ -333,7 +357,17 @@ mod tests {
         assert_eq!(o.seed, 7);
         assert_eq!(o.scale, 4);
         assert!(o.mute);
-        assert_eq!(o.delay, 5);
+        assert_eq!(o.delay, Some(5));
+        assert_eq!(o.effective_delay(), 5);
+        assert_eq!(Options::default().effective_delay(), 3);
+        let r = p("--rollback --prediction 12").unwrap();
+        assert!(r.rollback);
+        assert_eq!(r.prediction, 12);
+        assert_eq!(r.effective_delay(), 1);
+        assert!(matches!(
+            p("--prediction 0"),
+            Err(UsageError::BadValue(_, _))
+        ));
         assert_eq!(o.record.as_deref(), Some("r.kgmr"));
         assert_eq!(o.exit_after, Some(10));
     }

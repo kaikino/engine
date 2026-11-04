@@ -59,7 +59,10 @@ impl<'a> UpdateCtx<'a> {
 ///    enforces this).
 /// 3. `hash` must cover every field that influences `update`. If a field is
 ///    missed, a desync in that field will go undetected.
-pub trait Game {
+///
+/// Games are `Clone` so the rollback netcode can snapshot and restore them.
+/// Plain data with `#[derive(Clone)]` is all it takes.
+pub trait Game: Clone {
     /// Creates a fresh game from a match seed. All players call this with the
     /// same seed.
     fn new(seed: u32) -> Self
@@ -114,6 +117,7 @@ pub fn simulate<G: Game>(
 mod tests {
     use super::*;
 
+    #[derive(Clone)]
     struct Counter {
         n: i32,
     }

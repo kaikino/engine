@@ -9,6 +9,16 @@ compatibility) are marked **[sim]**.
 
 ## [Unreleased]
 
+### Added
+
+- **Rollback netcode.** `kagami::net::Rollback` predicts late remote inputs, snapshots the game each frame and re-simulates when a prediction was wrong; hashes are compared on confirmed frames only. The runtime exposes it as `--rollback` with `--prediction N`, for both UDP and loopback netplay, and the stats overlay shows rollbacks, re-simulated frames and the prediction lead.
+- `Session::rollback_udp`, `Session::rollback_loopback`, `NetStats` (shared statistics for both netcodes).
+
+### Changed
+
+- **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.
+- `--delay` is now optional and defaults to 3 for lockstep and 1 for rollback.
+
 ## [0.1.0] - 2026-11-03
 
 First release.
