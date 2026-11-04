@@ -31,7 +31,7 @@ They are what makes lockstep determinism practical, and they are permanent.
 | **Tiles** | 512 tiles of 8 × 8, authored as ASCII art in source |
 | **Backgrounds** | 2 scrolling layers of 32 × 32 tiles, per-tile flip and priority |
 | **Sprites** | 128 per frame, **16 per scanline** (the rest are dropped, like real hardware), 1 × 1 to 4 × 4 tiles |
-| **Overlay** | direct text, lines and rectangles with the built-in 8 × 8 font |
+| **Overlay** | direct text, lines and rectangles with the built-in 8 × 8 font (ASCII and katakana) |
 | **Sound** | 4 channels: two pulse, one triangle, one noise; tracker-style songs |
 | **Controller** | d-pad plus A, B, C, START; up to 4 players |
 | **Math** | 16.16 fixed point only. **Floats are a compile error** in simulation code. |

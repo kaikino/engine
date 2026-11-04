@@ -438,7 +438,7 @@ impl Ippon {
         let w = s.chars().count() as i32 * 16;
         let mut x = (SCREEN_W as i32 - w) / 2;
         for ch in s.chars() {
-            let g = font::glyph(ch);
+            let g = font::glyph_any(ch);
             for (row, bits) in g.iter().enumerate() {
                 for col in 0..8 {
                     if bits & (0x80 >> col) != 0 {
@@ -618,7 +618,7 @@ impl Game for Ippon {
             Phase::Title => {
                 gpu.rect_fill(0, 32, SCREEN_W as i32, 80, pal::SUMI);
                 Ippon::draw_big_text(gpu, 38, "IPPON", pal::GOFUN);
-                gpu.text_centered(60, "KENDO DUEL", pal::SORA);
+                gpu.text_centered(60, "イッポン  KENDO DUEL", pal::SORA);
                 if (self.frame / 30) % 2 == 0 {
                     gpu.text_centered(74, "PRESS START", pal::KI);
                 }
@@ -629,7 +629,7 @@ impl Game for Ippon {
             Phase::Hajime(t) => {
                 if t > HAJIME_FRAMES / 3 {
                     gpu.rect_fill(0, 52, SCREEN_W as i32, 32, pal::SUMI);
-                    Ippon::draw_big_text(gpu, 60, "HAJIME!", pal::KI);
+                    Ippon::draw_big_text(gpu, 60, "ハジメ!", pal::KI);
                 }
             }
             Phase::Fight => {}
@@ -657,7 +657,7 @@ impl Game for Ippon {
             }
             Phase::Victory { winner } => {
                 gpu.rect_fill(0, 44, SCREEN_W as i32, 48, pal::SUMI);
-                Ippon::draw_big_text(gpu, 48, "SHOBU ARI", pal::KIN);
+                Ippon::draw_big_text(gpu, 48, "ショウブアリ", pal::KIN);
                 let (label, color) = if winner == 0 {
                     ("SHIRO WINS", pal::GOFUN)
                 } else {

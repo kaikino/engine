@@ -7,7 +7,7 @@
 //! | Tile memory         | 512 tiles of 8×8, arranged as a 16-tile-wide sheet |
 //! | Backgrounds         | 2 layers, 32×32 tiles each, wrap-around scroll  |
 //! | Sprites             | 128 per frame, 16 per scanline, 1×1 to 4×4 tiles |
-//! | Overlay             | direct pixel/line/rect/text drawing on top      |
+//! | Overlay             | direct pixel/line/rect/text drawing on top; ASCII + katakana font |
 //! | Color key           | one palette index is transparent in tiles (default 0) |
 //! | Color remap         | 32-entry remap table applied at scan-out (palette swaps, flashes) |
 //!
@@ -23,6 +23,7 @@
 
 pub mod art;
 pub mod font;
+pub mod kana;
 pub mod palette;
 pub mod png;
 
@@ -359,15 +360,16 @@ impl Gpu {
         }
     }
 
-    /// Draws text with the system font on the overlay. Characters outside
-    /// printable ASCII draw as `?`. Returns the x coordinate after the text.
+    /// Draws text with the system font on the overlay: printable ASCII and
+    /// katakana (voiced marks composed). Anything else draws as `?`. Returns
+    /// the x coordinate after the text.
     pub fn text(&mut self, x: i32, y: i32, s: &str, color: u8) -> i32 {
         let mut cx = x;
         for ch in s.chars() {
             if ch == '\n' {
                 continue;
             }
-            let g = font::glyph(ch);
+            let g = font::glyph_any(ch);
             for (row, bits) in g.iter().enumerate() {
                 if *bits == 0 {
                     continue;
@@ -746,6 +748,21 @@ mod tests {
         g.render();
         assert_eq!(g.get_pixel(1, 1), palette::SUMI);
         assert_eq!(g.get_pixel(2, 2), palette::GOFUN);
+    }
+
+    #[test]
+    fn katakana_text_draws_and_composes_marks() {
+        let mut g = Gpu::new();
+        g.begin_frame();
+        g.text(0, 180, "カ", palette::GOFUN);
+        g.text(8, 180, "ガ", palette::GOFUN);
+        g.text(16, 180, "あ", palette::GOFUN); // unsupported: draws '?'
+        g.render();
+        let base: Vec<u8> = (0..8).map(|x| g.get_pixel(x, 180)).collect();
+        let voiced: Vec<u8> = (8..16).map(|x| g.get_pixel(x, 180)).collect();
+        assert!(base.contains(&palette::GOFUN));
+        assert_ne!(base, voiced);
+        assert_eq!(g.get_pixel(17, 180), palette::GOFUN); // '?' top arc
     }
 
     #[test]

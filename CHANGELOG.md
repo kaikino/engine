@@ -16,6 +16,8 @@ compatibility) are marked **[sim]**.
 
 - **Browser runtime.** `kagami-web` exposes a cartridge as fourteen C ABI exports; `web/kagami.js` is a dependency-free host (canvas, Web Audio, keyboard). `scripts/build-web.sh` produces an 86 KB `ippon.wasm`; `scripts/check-web.sh` runs it in headless Chromium and asserts the state hash equals the native build's. CI runs that check.
 
+- **Katakana in the system font.** `kagami::gpu::kana` adds the 46 basic kana, small kana, ー, ・, 「」、。 and composes every voiced and semi-voiced form; `Gpu::text` draws them directly. `cargo run -p kagami --example font_sheet` renders the full set.
+
 ### Changed
 
 - **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.

@@ -1,7 +1,9 @@
-//! The built-in 8×8 system font (printable ASCII 32..=126).
+//! The built-in 8×8 system font: printable ASCII 32..=126 plus katakana
+//! (see [`super::kana`]).
 //!
-//! Glyphs are 5×7 inside an 8×8 cell, authored as ASCII art and baked into
-//! bitmaps at compile time. A full text grid is 32 columns by 28 rows.
+//! ASCII glyphs are 5×7 and kana 7×7 inside an 8×8 cell, authored as text
+//! and baked into bitmaps at compile time. A full text grid is 32 columns by
+//! 28 rows.
 
 /// Width of a character cell in pixels.
 pub const GLYPH_W: i32 = 8;
@@ -150,8 +152,17 @@ const fn bake() -> [[u8; 8]; GLYPH_COUNT] {
     out
 }
 
-/// Returns the bitmap for a character, or the `?` glyph for anything outside
-/// printable ASCII.
+/// Returns the bitmap for any supported character: printable ASCII, katakana
+/// (composing voiced marks), or the `?` glyph for anything else.
+pub fn glyph_any(c: char) -> [u8; 8] {
+    if c.is_ascii() {
+        return *glyph(c);
+    }
+    super::kana::glyph(c).unwrap_or(*glyph('?'))
+}
+
+/// Returns the bitmap for a printable ASCII character, or the `?` glyph for
+/// anything else. Use [`glyph_any`] to include katakana.
 pub fn glyph(c: char) -> &'static [u8; 8] {
     let code = u32::from(c);
     let idx = if (u32::from(FIRST_CHAR)..u32::from(FIRST_CHAR) + GLYPH_COUNT as u32).contains(&code)
@@ -174,6 +185,10 @@ mod tests {
         assert_eq!(glyph('_')[6], 0b1111_1000);
         assert_eq!(glyph('あ'), glyph('?'));
         assert_eq!(glyph('\n'), glyph('?'));
+        assert_eq!(glyph_any('A'), *glyph('A'));
+        assert_eq!(glyph_any('あ'), *glyph('?'));
+        assert_ne!(glyph_any('カ'), *glyph('?'));
+        assert_eq!(glyph_any('カ'), super::super::kana::glyph('カ').unwrap());
         // Every glyph is confined to 5 columns and 7 rows.
         for g in &GLYPHS {
             assert_eq!(g[7], 0);

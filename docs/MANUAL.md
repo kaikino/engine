@@ -159,7 +159,11 @@ gpu.text_centered(y, "GAME OVER", palette::BENI);
 gpu.blit_tile(x, y, tile, flip_x, flip_y);  // a tile on the overlay, no object budget
 ```
 
-The system font covers printable ASCII in 8 × 8 cells: 32 columns by 28 rows.
+The system font covers printable ASCII and katakana in 8 × 8 cells: 32
+columns by 28 rows. Katakana includes the 46 basic kana, small kana, ー, ・,
+「」、。 and every voiced form (゛ and ゜ are composed onto the base glyph at
+draw time). Hiragana and kanji are not in the font and draw as `?`.
+`cargo run -p kagami --example font_sheet -- font.png` renders the whole set.
 
 ### 3.6 Remap
 
