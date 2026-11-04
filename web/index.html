@@ -42,6 +42,7 @@
     <button id="sound">sound on</button>
     <button id="save-replay">save replay</button>
     <label><input id="load-replay" type="file" accept=".kgmr" hidden>load replay</label>
+    <input id="scrub" type="range" min="0" max="0" value="0" hidden style="width:200px">
     <span>P1 arrows · Z X C · Enter — P2 WASD · J K L · Tab</span>
     <span><a href="?cart=ippon" style="color:#a0d8ef">ippon</a> · <a href="?cart=hanabi" style="color:#a0d8ef">hanabi</a></span>
   </div>
@@ -58,6 +59,7 @@
       players,
       autostart: params.get('autostart') !== '0',
       onFrame: (c) => {
+        if (c.replayPlaying) document.getElementById('scrub').value = c.frame;
         document.getElementById('frame').textContent = c.frame;
         document.getElementById('hash').textContent = c.hash;
         document.getElementById('fps').textContent = c.fps;
@@ -80,8 +82,12 @@
       const bytes = new Uint8Array(await file.arrayBuffer());
       const n = console_.loadReplay(bytes);
       document.getElementById('title').textContent = n === null ? `${console_.title} (not a replay)` : `${console_.title} replay, ${n} frames`;
-      if (n !== null) console_.start();
+      const scrub = document.getElementById('scrub');
+      if (n !== null) { scrub.hidden = false; scrub.max = n; console_.start(); }
     };
+    const scrub = document.getElementById('scrub');
+    scrub.addEventListener('input', () => { console_.stop(); console_.seekReplay(Number(scrub.value)); });
+    scrub.addEventListener('change', () => { console_.start(); });
     document.getElementById('load-replay').addEventListener('change', (e) => { if (e.target.files[0]) loadReplayFile(e.target.files[0]); });
     document.body.addEventListener('dragover', (e) => e.preventDefault());
     document.body.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) loadReplayFile(e.dataTransfer.files[0]); });

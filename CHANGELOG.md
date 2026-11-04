@@ -13,6 +13,8 @@ compatibility) are marked **[sim]**.
 
 - Hostile-input robustness tests: garbage datagrams, mutated replays and nonsense protocol messages against the wire decoder, the replay decoder, lockstep and rollback.
 - `kagami-runtime --example bench`: headless throughput for both cartridges; numbers in the README.
+- Replay scrubbing in the browser host: a slider seeks a loaded replay by re-simulating from the start (`kagami_replay_seek`).
+- Soak tests: 6,000 frames of random two-player play for each cartridge, drawn periodically, deterministic at the end.
 - **Tracker** (`web/tools/tracker.html`): four-track grid with keyboard note entry, live playback through the console's synthesizer in WebAssembly (`kagami_apu_*` preview exports), export and import of `Song` source; `kagami --example song_check` parses exports and compares samples. CI proves the browser and native synths produce identical samples.
 - **Tile editor** (`web/tools/tiles.html`): paint with the 32 pigments, export `KEY`/`COLORS`/`ART` constants ready for `parse_tiles`, import them back; `kagami --example art_check` validates exports. CI drives it in Chromium and parses the result natively.
 - **Browser replays.** The web console records every match (confirmed frames under rollback), exports and loads `.kgmr` files, verifies checkpoints, and plays replays back; *save replay* and drag-and-drop in the host page. CI records a replay in Chromium and verifies it with the native binary.

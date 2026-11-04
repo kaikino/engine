@@ -241,3 +241,28 @@ fn rollback_peers_across_a_laggy_network_confirm_identical_matches() {
     }
     assert_eq!(replay.verify::<Ippon>().unwrap(), confirmed[0][n - 1].2);
 }
+
+#[test]
+fn soak_six_thousand_frames_of_random_play_never_panics() {
+    use kagami::Gpu;
+    // Minutes of two chaotic players, drawn every 7th frame: no panics,
+    // no overflow, state hash still deterministic at the end.
+    fn run(seed: u32, gpu: &mut Gpu) -> u64 {
+        let mut inputs = RandomInputs::new(777);
+        let mut g = Ippon::new(seed);
+        g.setup(gpu);
+        let mut apu = Apu::new();
+        for f in 0..6_000 {
+            let mut ctx = UpdateCtx::new(inputs.frame(f, 2), f, 2, &mut apu);
+            g.update(&mut ctx);
+            if f % 7 == 0 {
+                gpu.begin_frame();
+                g.draw(gpu);
+                gpu.render();
+            }
+        }
+        hash(&g)
+    }
+    let mut gpu = Gpu::new();
+    assert_eq!(run(1, &mut gpu), run(1, &mut gpu));
+}

@@ -293,6 +293,32 @@ impl<G: Game> Console<G> {
         Some(frames)
     }
 
+    /// Under playback, re-simulates from the start up to `frame` (clamped to
+    /// the replay's length) so the host can scrub. Returns the new frame.
+    pub fn seek_replay(&mut self, frame: u32) -> u32 {
+        let Engine::Playback { source, .. } = &self.engine else {
+            return self.frame;
+        };
+        let source = source.clone();
+        let target = frame.min(source.len() as u32);
+        let mut game = G::new(source.seed);
+        let mut apu = Apu::new();
+        self.recording = Replay::new(source.seed, source.players);
+        self.confirmed_hashes.clear();
+        for f in 0..target {
+            let inputs = source.inputs(f);
+            let mut ctx = UpdateCtx::new(inputs, f, source.players, &mut apu);
+            game.update(&mut ctx);
+            self.recording.push(inputs);
+        }
+        self.frame = target;
+        self.gpu.begin_frame();
+        game.draw(&mut self.gpu);
+        self.gpu.render();
+        self.engine = Engine::Playback { game, apu, source };
+        target
+    }
+
     /// `true` while a loaded replay is driving the inputs.
     pub fn is_playback(&self) -> bool {
         matches!(self.engine, Engine::Playback { .. })
@@ -683,6 +709,7 @@ pub const HEIGHT: u32 = SCREEN_H as u32;
 /// | `kagami_replay_load() -> u32` | play back the staged replay; its frame count, or `0xFFFF_FFFF` if invalid |
 /// | `kagami_replay_verify() -> u32` | 0 = all checkpoints match, n = first mismatch at frame n-1, `0xFFFF_FFFF` = invalid |
 /// | `kagami_replay_playing() -> u32`, `kagami_replay_len() -> u32` | playback state |
+/// | `kagami_replay_seek(frame: u32) -> u32` | scrub playback to a frame by re-simulating from the start |
 /// | `kagami_apu_begin(frames_per_row, looped)` | start building a preview song (tools) |
 /// | `kagami_apu_track(wave)` | add a track: 0 pulse12, 1 pulse25, 2 pulse50, 3 pulse75, 4 triangle, 5 noise |
 /// | `kagami_apu_row(track, kind, note, vol)` | append a row: kind 0 hold, 1 off, 2 note on |
@@ -899,7 +926,12 @@ macro_rules! cartridge {
                 with(|c| c.playback_len())
             }
 
-            thread_local! {
+
+            #[no_mangle]
+            pub extern "C" fn kagami_replay_seek(frame: u32) -> u32 {
+                with(|c| c.seek_replay(frame))
+            }
+thread_local! {
                 static PREVIEW: RefCell<$crate::Preview> = RefCell::new($crate::Preview::new());
             }
 
@@ -1153,6 +1185,21 @@ mod tests {
         // The playback itself was recorded again, identically.
         d.export_replay();
         assert_eq!(d.export_buf(), &bytes[..]);
+        // Scrubbing re-simulates from the start and lands on the same states.
+        assert_eq!(d.seek_replay(30), 30);
+        let at30 = d.state_hash();
+        assert_eq!(d.frame(), 30);
+        for _ in 0..40 {
+            d.step(0);
+        }
+        assert_eq!(d.state_hash(), c.state_hash());
+        assert_eq!(d.seek_replay(999), 70);
+        assert_eq!(d.state_hash(), c.state_hash());
+        assert_eq!(d.seek_replay(30), 30);
+        assert_eq!(d.state_hash(), at30);
+        let mut local: Console<Blink> = Console::new(1, 1);
+        local.step(0);
+        assert_eq!(local.seek_replay(0), 1, "seek is a no-op outside playback");
 
         // Garbage is rejected; a corrupted checkpoint is located.
         let mut e: Console<Blink> = Console::new(1, 1);
@@ -1302,6 +1349,7 @@ mod tests {
         assert_eq!(x::kagami_replay_verify(), u32::MAX);
         assert_eq!(x::kagami_replay_playing(), 0);
         assert_eq!(x::kagami_replay_len(), 0);
+        assert_eq!(x::kagami_replay_seek(0), x::kagami_frame());
         // APU preview exports.
         x::kagami_apu_begin(4, 1);
         x::kagami_apu_track(2);

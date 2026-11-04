@@ -159,6 +159,8 @@ export async function boot({ wasmUrl, canvas, seed = 1, players = 1, autostart =
       return n;
     },
     get replayPlaying() { return x.kagami_replay_playing() === 1; },
+    /** Scrub a loaded replay to a frame (re-simulates from the start). */
+    seekReplay(frame) { this.frame = x.kagami_replay_seek(frame); this.present(); return this.frame; },
     get replayLength() { return x.kagami_replay_len(); },
     /** Hash of a confirmed frame, or null if not remembered. */
     confirmedHash(frame) {
