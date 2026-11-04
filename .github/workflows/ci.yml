@@ -33,7 +33,7 @@ jobs:
         run: scripts/check.sh
       - name: Upload smoke screenshot
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-screenshot
           path: target/smoke/smoke.png
@@ -82,7 +82,7 @@ jobs:
           sudo apt-get install -y libasound2-dev libudev-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
       - name: Build wasm, run headless Chromium, compare hashes with native
         run: NODE_PATH=$PWD/node_modules scripts/check-web.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-screenshot
           path: web/dist/e2e.png
@@ -106,7 +106,7 @@ jobs:
             --ignore-filename-regex 'window\.rs|main\.rs'
           cargo llvm-cov report --fail-under-lines 85 \
             --ignore-filename-regex 'window\.rs|main\.rs'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: lcov.info
