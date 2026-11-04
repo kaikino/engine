@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "hanabi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagami",
  "kagami-runtime",
@@ -520,7 +520,7 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "hello"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagami",
  "kagami-runtime",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "ippon"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagami",
  "kagami-runtime",
@@ -653,11 +653,11 @@ dependencies = [
 
 [[package]]
 name = "kagami"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "kagami-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cpal",
  "gilrs",
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "kagami-web"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kagami",
 ]

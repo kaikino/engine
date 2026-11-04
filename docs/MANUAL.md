@@ -343,7 +343,8 @@ saves at all.
 Any gamepad the operating system recognises works: the first one connected
 is player 1, the second player 2, and so on, alongside the keyboard. South
 is A, East is B, West/North is C, Start or Select is START, and the d-pad or
-left stick moves. `--no-gamepad` ignores them.
+left stick moves. `--no-gamepad` ignores them. The browser host reads
+gamepads the same way through the Gamepad API.
 
 ## 10. Care and handling
 

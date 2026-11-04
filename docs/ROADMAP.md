@@ -30,12 +30,12 @@ These are the console. Changing them would make a different console.
 - Save data (2 KB SRAM per cartridge) and gamepads.
 - HANABI, a second cartridge exercising scrolling, raster effects and the sprite budget.
 - Browser netplay over WebRTC with serverless signaling.
+- Gamepads in the browser host.
 
 ## v0.2 candidates
 
-1. Gamepads in the browser host.
-2. A tracker and tile editor that write Rust source.
-3. A native-to-browser bridge transport.
+1. A tracker and tile editor that write Rust source.
+2. A native-to-browser bridge transport.
 
 ## How to propose a change
 

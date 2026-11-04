@@ -29,6 +29,30 @@ export async function boot({ wasmUrl, canvas, seed = 1, players = 1, autostart =
   const title = new TextDecoder().decode(titleBytes);
 
   const pads = [0, 0, 0, 0];
+  // Gamepads: the first connected pad is player 1, the second player 2.
+  // Standard mapping: buttons 0/1/2/3 = A/B/C/C, 9 = START, 12..15 = d-pad,
+  // axes 0/1 = left stick. Merged with the keyboard on every frame.
+  const DEADZONE = 0.5;
+  const readGamepads = () => {
+    if (!navigator.getGamepads) return [0, 0, 0, 0];
+    const out = [0, 0, 0, 0];
+    let slot = 0;
+    for (const gp of navigator.getGamepads()) {
+      if (!gp || slot >= 4) continue;
+      const b = (i) => gp.buttons[i] && gp.buttons[i].pressed;
+      let bits = 0;
+      if (b(12) || gp.axes[1] <= -DEADZONE) bits |= 1;
+      if (b(13) || gp.axes[1] >= DEADZONE) bits |= 2;
+      if (b(14) || gp.axes[0] <= -DEADZONE) bits |= 4;
+      if (b(15) || gp.axes[0] >= DEADZONE) bits |= 8;
+      if (b(0)) bits |= 16;
+      if (b(1)) bits |= 32;
+      if (b(2) || b(3)) bits |= 64;
+      if (b(9) || b(8)) bits |= 128;
+      out[slot++] = bits;
+    }
+    return out;
+  };
   const onKey = (down) => (e) => {
     const b = KEYS[e.code];
     if (!b) return;
@@ -78,8 +102,10 @@ export async function boot({ wasmUrl, canvas, seed = 1, players = 1, autostart =
   const state = {
     title, frame: 0, hash: '', fps: 0, running: false, instance,
     get packedInputs() {
-      if (net) return (pads[0] << (8 * net.localPlayer)) >>> 0; // P1 keys drive the local player
-      return (pads[0] | (pads[1] << 8) | (pads[2] << 16) | (pads[3] << 24)) >>> 0;
+      const gp = readGamepads();
+      const p = pads.map((k, i) => k | gp[i]);
+      if (net) return (p[0] << (8 * net.localPlayer)) >>> 0; // P1 keys and the first pad drive the local player
+      return (p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24)) >>> 0;
     },
     enableSound,
     /** Simulate one frame with explicit packed inputs (for tests and tools). */

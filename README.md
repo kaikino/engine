@@ -174,9 +174,9 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 
 ## Status
 
-v0.1.0 is the first release. It is a complete console you can ship a game on
-today, with one deliberate limit: games are compiled in (no cartridge
-loader). Browser netplay (a WebRTC transport) is not there yet. The [roadmap](docs/ROADMAP.md) explains what comes next and,
+v0.2.0. A complete console you can ship a game on today, native or in the
+browser, with lockstep or rollback netplay on both. One deliberate limit
+remains: games are compiled in (no cartridge loader). The [roadmap](docs/ROADMAP.md) explains what comes next and,
 just as importantly, what will never change.
 
 ## License

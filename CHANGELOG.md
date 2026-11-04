@@ -9,6 +9,10 @@ compatibility) are marked **[sim]**.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-04
+
+The console grows up: rollback, the browser, a second cartridge.
+
 ### Added
 
 - **Rollback netcode.** `kagami::net::Rollback` predicts late remote inputs, snapshots the game each frame and re-simulates when a prediction was wrong; hashes are compared on confirmed frames only. The runtime exposes it as `--rollback` with `--prediction N`, for both UDP and loopback netplay, and the stats overlay shows rollbacks, re-simulated frames and the prediction lead.
@@ -21,7 +25,7 @@ compatibility) are marked **[sim]**.
 - **Raster effects.** Per-scanline horizontal scroll tables per background (`Background::set_line_scroll`), horizontal window masks (`Background::window`) and a mosaic register (`Gpu::set_mosaic`). IPPON uses a heat haze on its title and a mosaic ramp when a point is called.
 
 - **Save data.** `Game::load_sram` / `Game::save_sram` with a 2 KB budget; the runtime persists `kagami-<title>.sram` for local play (`--sram`, `--no-sram`). IPPON keeps a lifetime win record on its title screen.
-- **Gamepads.** The runtime reads gamepads through `gilrs` (feature `gamepad`, on by default), first pad to player 1, merged with the keyboard; `--no-gamepad` ignores them.
+- **Gamepads.** The runtime reads gamepads through `gilrs` (feature `gamepad`, on by default), first pad to player 1, merged with the keyboard; `--no-gamepad` ignores them. The browser host does the same through the Gamepad API.
 
 - **HANABI**, a second cartridge: a two-player co-op vertical shooter on a scrolling festival river with a per-scanline water reflection, bombs, oni bosses, a saved high score, kana text, and enough lanterns to overrun the 16-sprite scanline budget on purpose (its tests assert that it does). Builds for the browser too.
 
@@ -52,5 +56,6 @@ First release.
 - Documentation: manual, architecture, determinism contract, netcode, decisions, roadmap.
 - CI on Linux, macOS and Windows; coverage gate; release workflow producing binaries for all three.
 
-[Unreleased]: https://github.com/kaikino/engine/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kaikino/engine/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kaikino/engine/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kaikino/engine/releases/tag/v0.1.0

@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/kagami", "crates/kagami-runtime", "crates/kagami-web", "games/hello", "games/ippon", "games/hanabi"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
 license = "MIT"
@@ -12,9 +12,9 @@ homepage = "https://github.com/kaikino/engine"
 authors = ["kaikino"]
 
 [workspace.dependencies]
-kagami = { path = "crates/kagami", version = "0.1.0" }
-kagami-runtime = { path = "crates/kagami-runtime", version = "0.1.0" }
-kagami-web = { path = "crates/kagami-web", version = "0.1.0" }
+kagami = { path = "crates/kagami", version = "0.2.0" }
+kagami-runtime = { path = "crates/kagami-runtime", version = "0.2.0" }
+kagami-web = { path = "crates/kagami-web", version = "0.2.0" }
 
 [workspace.lints.rust]
 missing_docs = "warn"
