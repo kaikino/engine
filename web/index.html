@@ -14,11 +14,26 @@
   button { font: inherit; background: #223a70; color: #fffffc; border: 0; padding: 6px 12px; cursor: pointer; }
   button:hover { background: #165e83; }
   .kanji { font-size: 20px; letter-spacing: .3em; }
+  #netplay { width: min(96vw, 760px); font-size: 13px; }
+  #netplay .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+  #netplay textarea { width: 100%; box-sizing: border-box; background: #111; color: #a0d8ef; border: 1px solid #223a70; font: inherit; }
 </style>
 </head>
 <body>
   <div class="kanji">鏡 KAGAMI</div>
   <canvas id="screen" width="256" height="224"></canvas>
+  <details id="netplay">
+    <summary>netplay (no server: swap codes with a friend)</summary>
+    <div class="row">
+      <label>mode <select id="np-mode"><option value="lockstep">lockstep</option><option value="rollback">rollback</option></select></label>
+      <label>delay <input id="np-delay" type="number" min="0" max="32" value="2" size="3"></label>
+      <button id="np-host">host: make offer code</button>
+      <button id="np-join">join: answer an offer code</button>
+      <span id="np-status">idle</span>
+    </div>
+    <textarea id="np-code" rows="3" placeholder="codes appear here / paste the other player's code here"></textarea>
+    <button id="np-accept">host: accept answer code</button>
+  </details>
   <div id="hud">
     <span>cart <b id="title">…</b></span>
     <span>frame <b id="frame">0</b></span>
@@ -49,6 +64,41 @@
     document.getElementById('title').textContent = console_.title;
     document.getElementById('sound').addEventListener('click', () => console_.enableSound());
     window.kagami = console_;
+
+    // Netplay UI.
+    const { hostLink, joinLink, attachNetplay } = await import('./netplay.js');
+    const $ = (id) => document.getElementById(id);
+    const status = (s) => { $('np-status').textContent = s; };
+    let link = null;
+    const begin = (localPlayer) => {
+      const rollback = $('np-mode').value === 'rollback';
+      const delay = Number($('np-delay').value);
+      console_.stop();
+      attachNetplay(console_, link, { localPlayer, players: 2, delay, rollback });
+      console_.start();
+      status(`connected as P${localPlayer + 1} (${rollback ? 'rollback' : 'lockstep'}, delay ${delay})`);
+    };
+    $('np-host').addEventListener('click', async () => {
+      status('gathering…');
+      link = await hostLink();
+      $('np-code').value = link.code;
+      status('send this offer code to the guest, then paste their answer and accept');
+    });
+    $('np-accept').addEventListener('click', async () => {
+      if (!link) return;
+      status('connecting…');
+      await link.accept($('np-code').value);
+      begin(0);
+    });
+    $('np-join').addEventListener('click', async () => {
+      status('answering…');
+      link = await joinLink($('np-code').value);
+      $('np-code').value = link.code;
+      status('send this answer code back to the host; the match starts when they accept');
+      await link.opened;
+      begin(1);
+    });
+    window.kagamiNet = { hostLink, joinLink, attachNetplay, get link() { return link; } };
   </script>
 </body>
 </html>

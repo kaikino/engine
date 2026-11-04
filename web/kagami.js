@@ -62,17 +62,59 @@ export async function boot({ wasmUrl, canvas, seed = 1, players = 1, autostart =
     nextAudioTime += n / SAMPLE_RATE;
   };
 
+  // Netplay plumbing: the session lives inside the module; we move bytes.
+  let net = null; // { localPlayer, send }
+  const pumpOutgoing = () => {
+    if (!net) return;
+    let n;
+    while ((n = x.kagami_net_outgoing()) > 0) {
+      const to = x.kagami_net_outgoing_to();
+      const bytes = new Uint8Array(x.memory.buffer, x.kagami_outbox_ptr(), n).slice();
+      net.send(to, bytes);
+    }
+  };
+  const hex64 = (hi, lo) => (hi >>> 0).toString(16).padStart(8, '0') + (lo >>> 0).toString(16).padStart(8, '0');
+
   const state = {
     title, frame: 0, hash: '', fps: 0, running: false, instance,
-    get packedInputs() { return (pads[0] | (pads[1] << 8) | (pads[2] << 16) | (pads[3] << 24)) >>> 0; },
+    get packedInputs() {
+      if (net) return (pads[0] << (8 * net.localPlayer)) >>> 0; // P1 keys drive the local player
+      return (pads[0] | (pads[1] << 8) | (pads[2] << 16) | (pads[3] << 24)) >>> 0;
+    },
     enableSound,
     /** Simulate one frame with explicit packed inputs (for tests and tools). */
     step(packed = this.packedInputs) {
       x.kagami_step(packed);
+      pumpOutgoing();
       pushAudio();
       this.frame = x.kagami_frame();
-      const hi = x.kagami_hash_hi() >>> 0, lo = x.kagami_hash_lo() >>> 0;
-      this.hash = hi.toString(16).padStart(8, '0') + lo.toString(16).padStart(8, '0');
+      this.hash = hex64(x.kagami_hash_hi(), x.kagami_hash_lo());
+    },
+    /** Start a netplay session. `send(to, bytes)` carries datagrams out. */
+    startNet({ localPlayer, players, delay = 2, prediction = 0, send }) {
+      net = { localPlayer, send };
+      x.kagami_net_start(localPlayer, players, delay, prediction);
+      this.frame = 0;
+    },
+    stopNet() { net = null; x.kagami_net_stop(); this.frame = 0; },
+    get inNetplay() { return net !== null; },
+    /** Hand a datagram from the network to the session. */
+    receive(bytes) {
+      const n = Math.min(bytes.length, 512);
+      new Uint8Array(x.memory.buffer, x.kagami_inbox_ptr(), n).set(bytes.subarray(0, n));
+      x.kagami_net_recv(n);
+    },
+    /** 'ok' | 'waiting' | 'desynced' after the last step. */
+    get netStatus() { return ['ok', 'waiting', 'desynced'][x.kagami_net_status()] ?? 'ok'; },
+    get desyncFrame() { return x.kagami_net_desync_frame(); },
+    get netStats() {
+      const s = (i) => x.kagami_net_stat(i);
+      return { frames: s(0), stalls: s(1), sent: s(2), received: s(3), rollbacks: s(4), resimulated: s(5), confirmed: s(6) };
+    },
+    /** Hash of a confirmed frame, or null if not remembered. */
+    confirmedHash(frame) {
+      const hi = x.kagami_confirmed_hash_hi(frame), lo = x.kagami_confirmed_hash_lo(frame);
+      return (hi === 0 && lo === 0) ? null : hex64(hi, lo);
     },
     present() {
       image.data.set(mem().subarray(x.kagami_fb_ptr(), x.kagami_fb_ptr() + x.kagami_fb_len()));

@@ -300,6 +300,10 @@ dependency under `cfg(not(target_arch = "wasm32"))`. Build with
 `web/index.html?cart=<name>` at the `.wasm`. The exports are documented on
 `kagami_web::cartridge!`.
 
+The browser host plays over the network too: the *netplay* panel exchanges
+offer and answer codes between two players (no server), opens a WebRTC data
+channel, and runs the same lockstep or rollback session inside the module.
+
 ## 8. Netplay
 
 Every console runs the same game on the same inputs. An input pressed on

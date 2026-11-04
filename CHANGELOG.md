@@ -25,6 +25,8 @@ compatibility) are marked **[sim]**.
 
 - **HANABI**, a second cartridge: a two-player co-op vertical shooter on a scrolling festival river with a per-scanline water reflection, bombs, oni bosses, a saved high score, kana text, and enough lanterns to overrun the 16-sprite scanline budget on purpose (its tests assert that it does). Builds for the browser too.
 
+- **Browser netplay.** The lockstep and rollback sessions run inside the WebAssembly module (`kagami_net_*` exports, `QueueTransport`); `web/netplay.js` carries datagrams over an unordered, unreliable WebRTC data channel with serverless offer/answer-code signaling, and `web/index.html` has a netplay panel. `web/test/netplay.mjs` plays a match between two headless Chromium pages in both modes; CI runs it.
+
 ### Changed
 
 - **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.

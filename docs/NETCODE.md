@@ -97,6 +97,25 @@ The first stalls constantly; the second plays smoothly and the F1 overlay
 counts the rollbacks (`RB`), re-simulated frames (`RESIM`) and how far
 ahead of confirmation it is running (`AHEAD`).
 
+## In the browser
+
+The same sessions run inside the WebAssembly build. `web/netplay.js` opens
+a WebRTC data channel configured like UDP (unordered, no retransmits) and
+`kagami.js` moves datagrams between it and the module through the
+`kagami_net_*` exports. Signaling is serverless: the host's page produces an
+*offer code*, the guest pastes it and produces an *answer code*, the host
+pastes that, and the match starts. Any chat carries the codes. A public
+STUN server is listed so peers behind home routers can find each other;
+symmetric NATs still need a relay, which KAGAMI does not provide.
+
+Native and browser peers cannot play each other: one speaks UDP, the other
+WebRTC. The wire format is identical, so a bridge is a transport, not a
+protocol change.
+
+`web/test/netplay.mjs` runs two pages in one headless Chromium, relays the
+codes, plays 240 frames in both modes and asserts the confirmed hashes
+agree. CI runs it.
+
 ## What neither netcode does
 
 - **Matchmaking, NAT traversal, relays.** Peers need to reach each other's UDP port. On a LAN that just works; across the internet you need port forwarding or a relay.

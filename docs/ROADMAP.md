@@ -16,7 +16,7 @@ These are the console. Changing them would make a different console.
 
 | Feature | Why not yet | Where it would go |
 |---|---|---|
-| **Browser netplay** | The wasm build runs locally; netplay in a browser needs a WebRTC data-channel `Transport` and a signaling server. | `kagami-web` + a small signaling service |
+| **Relay / TURN for symmetric NATs** | Browser netplay is direct WebRTC with STUN; peers that cannot hole-punch need a relay. | separate project |
 | **Cartridge loader** | Games are compiled in. Loading a cartridge at runtime means a sandbox (wasm modules are the obvious one). | `kagami-cart` crate |
 | **Kanji in the system font** | Katakana is in. Kanji at 8 × 8 is a different project (and a different font size). | `kagami::gpu::font` |
 | **Relay server / NAT traversal** | Out of the console's scope; a relay is a `Transport`. | separate project |
@@ -29,12 +29,13 @@ These are the console. Changing them would make a different console.
 - Raster effects: per-line scroll, window masks, mosaic.
 - Save data (2 KB SRAM per cartridge) and gamepads.
 - HANABI, a second cartridge exercising scrolling, raster effects and the sprite budget.
+- Browser netplay over WebRTC with serverless signaling.
 
 ## v0.2 candidates
 
-1. WebRTC transport for browser netplay.
-2. Gamepads in the browser host.
-3. A tracker and tile editor that write Rust source.
+1. Gamepads in the browser host.
+2. A tracker and tile editor that write Rust source.
+3. A native-to-browser bridge transport.
 
 ## How to propose a change
 
