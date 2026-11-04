@@ -455,6 +455,18 @@ pub fn run<G: Game + 'static>(
         }
     };
 
+    #[cfg(feature = "gamepad")]
+    let gamepads = if opts.no_gamepad {
+        None
+    } else {
+        Gamepads::open()
+    };
+    #[cfg(feature = "gamepad")]
+    if let Some(p) = &gamepads {
+        if p.count() > 0 {
+            writeln!(out, "gamepads: {}", p.count())?;
+        }
+    }
     let now = Instant::now();
     let mut gpu = Gpu::new();
     session.game().setup(&mut gpu);
@@ -464,11 +476,7 @@ pub fn run<G: Game + 'static>(
         keymap: KeyMap::default(),
         controllers: Controllers::default(),
         #[cfg(feature = "gamepad")]
-        gamepads: if opts.no_gamepad {
-            None
-        } else {
-            Gamepads::open()
-        },
+        gamepads,
         sram_path,
         window: None,
         surface: None,

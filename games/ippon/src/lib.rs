@@ -990,7 +990,7 @@ mod tests {
         assert_eq!(g.record(), [0, 0]);
         g.load_sram(b"junk");
         assert_eq!(g.record(), [0, 0]);
-        g.load_sram(&[b'I', b'P', b'P', b'N', 3, 0, 300 % 256, 1]);
+        g.load_sram(&[b'I', b'P', b'P', b'N', 3, 0, 44, 1]); // 300 = 0x012C
         assert_eq!(g.record(), [3, 300]);
         let saved = g.save_sram().unwrap();
         let mut h = Ippon::new(1);
