@@ -1,0 +1,16 @@
+[package]
+name = "kagami-web"
+description = "Browser runtime glue for KAGAMI cartridges: a C ABI over the console for a dependency-free JavaScript host."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[dependencies]
+kagami = { workspace = true }
+
+[lints]
+workspace = true

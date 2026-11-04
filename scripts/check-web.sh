@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Builds the browser runtime and proves it matches the native build.
+# Needs: the wasm32-unknown-unknown target, Node 18+, and Playwright with
+# Chromium (`npx playwright install chromium`).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+J=${CARGO_BUILD_JOBS:+-j $CARGO_BUILD_JOBS}
+echo "== web: build wasm"
+scripts/build-web.sh
+echo "== web: native reference hash (120 frames, 2 players, seed 1, no input)"
+cargo build $J -p ippon --release
+native=$(target/release/ippon --headless --frames 120 --players 2 --seed 1 | sed -n 's/^state hash: //p')
+echo "native state hash: $native"
+echo "== web: browser e2e"
+node web/test/e2e.mjs "$native"

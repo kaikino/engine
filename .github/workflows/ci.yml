@@ -61,6 +61,32 @@ jobs:
       - name: Loopback netplay with 10% loss for 120 frames
         run: xvfb-run -a target/release/ippon --netplay loopback --latency 4 --loss 100 --exit-after 120 --mute
 
+  web:
+    name: browser build matches native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Playwright with Chromium
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-xcb-dev libxkbcommon-dev libwayland-dev
+      - name: Build wasm, run headless Chromium, compare hashes with native
+        run: NODE_PATH=$PWD/node_modules scripts/check-web.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-screenshot
+          path: web/dist/e2e.png
+
   coverage:
     name: coverage >= 85%
     runs-on: ubuntu-latest

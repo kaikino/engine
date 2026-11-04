@@ -16,7 +16,7 @@ These are the console. Changing them would make a different console.
 
 | Feature | Why not yet | Where it would go |
 |---|---|---|
-| **WebAssembly build** | All three runtime dependencies support `wasm32`; the browser build simply was not verified end to end. | `kagami-runtime` with a `web` feature; WebRTC `Transport` |
+| **Browser netplay** | The wasm build runs locally; netplay in a browser needs a WebRTC data-channel `Transport` and a signaling server. | `kagami-web` + a small signaling service |
 | **Cartridge loader** | Games are compiled in. Loading a cartridge at runtime means a sandbox (wasm modules are the obvious one). | `kagami-cart` crate |
 | **Gamepads** | Keyboard only. `gilrs` is the likely dependency. | `kagami-runtime::keys` |
 | **Katakana / kanji in the system font** | The 8 × 8 font covers printable ASCII; a kana set is 46+ glyphs of pixel art that deserve care. | `kagami::gpu::font` |
@@ -27,10 +27,11 @@ These are the console. Changing them would make a different console.
 ## Done since v0.1.0
 
 - Rollback netcode (`kagami::net::Rollback`, `--rollback`).
+- Browser runtime (`kagami-web`, `web/`), hash-checked against native in CI.
 
 ## v0.2 candidates
 
-1. `wasm32` runtime and a WebRTC transport, so IPPON runs in a browser tab.
+1. WebRTC transport for browser netplay.
 2. Gamepad support.
 3. Kana glyphs.
 

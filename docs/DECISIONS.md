@@ -96,9 +96,15 @@ on Linux, macOS and Windows. A platform-dependent bug cannot pass CI. The
 cost is that intentional simulation changes must update the constant, which
 is a feature: it forces the changelog entry.
 
-## D14. No wasm in v0.1
+## D14. The browser runtime is a C ABI plus plain JavaScript
 
-`winit`, `softbuffer` and `cpal` all support `wasm32`, and the console has
-no platform code, so a browser build is close. It is excluded from v0.1 only
-because it could not be verified end to end in the initial build
-environment, and KAGAMI does not ship what it has not run.
+`winit`, `softbuffer` and `cpal` support `wasm32`, but routing the browser
+build through them means `wasm-bindgen`, `web-sys` feature lists and a JS
+bundler. The console only needs five things from a host: boot, step with
+inputs, read the framebuffer, read the audio, read the hash. Those are
+fourteen `extern "C"` functions and 150 lines of JavaScript, with no build
+tooling beyond `cargo build --target wasm32-unknown-unknown`. The host is
+also the smallest possible reference for porting KAGAMI anywhere else.
+
+It is the one place the workspace allows the `unsafe_code` lint, for
+`#[no_mangle]`; the crate contains no `unsafe` blocks.

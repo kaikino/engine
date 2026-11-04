@@ -265,6 +265,22 @@ Keys: P1 arrows, Z = A, X = B, C = C, Enter = START. P2 W A S D, J = A,
 K = B, L = C, Tab = START. F1 toggles the stats overlay, F2 saves a
 screenshot, F3 mutes, F4 saves a replay, Esc quits.
 
+## 7.1 Browser
+
+Add to your cartridge's library crate:
+
+```rust
+#[cfg(target_arch = "wasm32")]
+kagami_web::cartridge!(MyGame);
+```
+
+with `crate-type = ["rlib", "cdylib"]`, a `kagami-web` dependency under
+`[target.'cfg(target_arch = "wasm32")'.dependencies]`, and the runtime
+dependency under `cfg(not(target_arch = "wasm32"))`. Build with
+`cargo build --target wasm32-unknown-unknown --release` and point
+`web/index.html?cart=<name>` at the `.wasm`. The exports are documented on
+`kagami_web::cartridge!`.
+
 ## 8. Netplay
 
 Every console runs the same game on the same inputs. An input pressed on

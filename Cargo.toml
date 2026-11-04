@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/kagami", "crates/kagami-runtime", "games/hello", "games/ippon"]
+members = ["crates/kagami", "crates/kagami-runtime", "crates/kagami-web", "games/hello", "games/ippon"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,10 +14,13 @@ authors = ["kaikino"]
 [workspace.dependencies]
 kagami = { path = "crates/kagami", version = "0.1.0" }
 kagami-runtime = { path = "crates/kagami-runtime", version = "0.1.0" }
+kagami-web = { path = "crates/kagami-web", version = "0.1.0" }
 
 [workspace.lints.rust]
 missing_docs = "warn"
-unsafe_code = "forbid"
+# "deny" rather than "forbid" so kagami-web can allow it for its `#[no_mangle]`
+# exports (the only unsafe-lint item in the workspace; it contains no unsafe blocks).
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

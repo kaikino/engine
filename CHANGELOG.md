@@ -14,6 +14,8 @@ compatibility) are marked **[sim]**.
 - **Rollback netcode.** `kagami::net::Rollback` predicts late remote inputs, snapshots the game each frame and re-simulates when a prediction was wrong; hashes are compared on confirmed frames only. The runtime exposes it as `--rollback` with `--prediction N`, for both UDP and loopback netplay, and the stats overlay shows rollbacks, re-simulated frames and the prediction lead.
 - `Session::rollback_udp`, `Session::rollback_loopback`, `NetStats` (shared statistics for both netcodes).
 
+- **Browser runtime.** `kagami-web` exposes a cartridge as fourteen C ABI exports; `web/kagami.js` is a dependency-free host (canvas, Web Audio, keyboard). `scripts/build-web.sh` produces an 86 KB `ippon.wasm`; `scripts/check-web.sh` runs it in headless Chromium and asserts the state hash equals the native build's. CI runs that check.
+
 ### Changed
 
 - **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.

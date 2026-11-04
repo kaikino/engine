@@ -14,6 +14,9 @@
 pub mod art;
 pub mod music;
 
+#[cfg(target_arch = "wasm32")]
+kagami_web::cartridge!(Ippon);
+
 use kagami::gpu::{font, Sprite, PRIORITY, SCREEN_W};
 use kagami::input::Edge;
 use kagami::{palette as pal, Fx, Game, Gpu, Input, Rng, StateHasher, UpdateCtx};

@@ -10,6 +10,7 @@ publish = false
 
 [lib]
 path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
 
 [[bin]]
 name = "ippon"
@@ -17,7 +18,12 @@ path = "src/main.rs"
 
 [dependencies]
 kagami = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 kagami-runtime = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+kagami-web = { workspace = true }
 
 [lints]
 workspace = true

@@ -36,6 +36,7 @@ They are what makes lockstep determinism practical, and they are permanent.
 | **Controller** | d-pad plus A, B, C, START; up to 4 players |
 | **Math** | 16.16 fixed point only. **Floats are a compile error** in simulation code. |
 | **Netplay** | input-delay lockstep *or* rollback over UDP, hash-checked every N frames |
+| **Targets** | native (Linux, macOS, Windows) and the browser via WebAssembly |
 | **Replays** | one byte per player per frame, self-verifying |
 
 Everything above lives in the `kagami` crate, which has **zero dependencies**.
@@ -76,6 +77,22 @@ cargo run --release -p ippon -- --netplay udp --player 1 --bind 0.0.0.0:7777 --p
 
 Press F1 in any window for the stats overlay: frame, state hash, stalls,
 packets. Full key list and flags: `cargo run -p ippon -- --help`.
+
+### In the browser
+
+The console has no platform code, so it also runs as an 86 KB WebAssembly
+module driven by 150 lines of plain JavaScript (no bundler, no bindings
+generator):
+
+```bash
+rustup target add wasm32-unknown-unknown
+scripts/build-web.sh          # -> web/dist/ippon.wasm
+python3 -m http.server -d web 8000   # any static server; open http://localhost:8000/
+```
+
+CI runs the browser build in headless Chromium and checks that its state
+hash after 120 frames equals the native build's. x86-64 and wasm32 agree bit
+for bit; that is what fixed-point buys you.
 
 ## Write a cartridge
 
@@ -131,6 +148,7 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 | `crates/kagami-runtime` | Native runtime: window, keyboard, audio, headless mode, CLI. |
 | `games/ippon` | IPPON, the reference cartridge, with the engine's end-to-end tests. |
 | `games/hello` | The smallest possible cartridge. |
+| `crates/kagami-web` | C ABI over the console for the browser; `web/` holds the JavaScript host and its Playwright test. |
 | `docs/` | [Manual](docs/MANUAL.md) · [Architecture](docs/ARCHITECTURE.md) · [Determinism](docs/DETERMINISM.md) · [Netcode](docs/NETCODE.md) · [Decisions](docs/DECISIONS.md) · [Roadmap](docs/ROADMAP.md) |
 | `scripts/check.sh` | The full quality gate CI runs: fmt, clippy, docs, tests, placeholder scan, release build, headless smoke, replay verify. |
 
@@ -146,8 +164,8 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 ## Status
 
 v0.1.0 is the first release. It is a complete console you can ship a game on
-today, with these deliberate limits: games are compiled in (no cartridge
-loader) and the runtime is native only. The [roadmap](docs/ROADMAP.md) explains what comes next and,
+today, with one deliberate limit: games are compiled in (no cartridge
+loader). Browser netplay (a WebRTC transport) is not there yet. The [roadmap](docs/ROADMAP.md) explains what comes next and,
 just as importantly, what will never change.
 
 ## License

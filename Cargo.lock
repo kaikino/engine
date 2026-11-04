@@ -475,6 +475,7 @@ version = "0.1.0"
 dependencies = [
  "kagami",
  "kagami-runtime",
+ "kagami-web",
 ]
 
 [[package]]
@@ -499,6 +500,7 @@ version = "0.1.0"
 dependencies = [
  "kagami",
  "kagami-runtime",
+ "kagami-web",
 ]
 
 [[package]]
@@ -592,6 +594,13 @@ dependencies = [
  "kagami",
  "softbuffer",
  "winit",
+]
+
+[[package]]
+name = "kagami-web"
+version = "0.1.0"
+dependencies = [
+ "kagami",
 ]
 
 [[package]]

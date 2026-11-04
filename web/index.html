@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAGAMI 鏡</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #1c1c1c; color: #f8f4e6; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; width: min(96vw, calc(96vh * 256 / 224)); aspect-ratio: 256 / 224; background: #000; outline: 2px solid #165e83; }
+  #hud { font-size: 13px; opacity: .8; display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  #hud b { color: #f8b500; }
+  button { font: inherit; background: #223a70; color: #fffffc; border: 0; padding: 6px 12px; cursor: pointer; }
+  button:hover { background: #165e83; }
+  .kanji { font-size: 20px; letter-spacing: .3em; }
+</style>
+</head>
+<body>
+  <div class="kanji">鏡 KAGAMI</div>
+  <canvas id="screen" width="256" height="224"></canvas>
+  <div id="hud">
+    <span>cart <b id="title">…</b></span>
+    <span>frame <b id="frame">0</b></span>
+    <span>hash <b id="hash">—</b></span>
+    <span>fps <b id="fps">0</b></span>
+    <button id="sound">sound on</button>
+    <span>P1 arrows · Z X C · Enter — P2 WASD · J K L · Tab</span>
+  </div>
+  <script type="module">
+    import { boot } from './kagami.js';
+    const params = new URLSearchParams(location.search);
+    const cart = params.get('cart') ?? 'ippon';
+    const seed = Number(params.get('seed') ?? 1) >>> 0;
+    const players = Number(params.get('players') ?? 2);
+    const console_ = await boot({
+      wasmUrl: `./dist/${cart}.wasm`,
+      canvas: document.getElementById('screen'),
+      seed,
+      players,
+      autostart: params.get('autostart') !== '0',
+      onFrame: (c) => {
+        document.getElementById('frame').textContent = c.frame;
+        document.getElementById('hash').textContent = c.hash;
+        document.getElementById('fps').textContent = c.fps;
+      },
+    });
+    document.getElementById('title').textContent = console_.title;
+    document.getElementById('sound').addEventListener('click', () => console_.enableSound());
+    window.kagami = console_;
+  </script>
+</body>
+</html>
