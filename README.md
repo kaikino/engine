@@ -167,7 +167,7 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 | `crates/kagami-web` | C ABI over the console for the browser; `web/` holds the JavaScript host and its Playwright tests. |
 | `web/tools/tiles.html` | Tile editor: paint with the 32 pigments, export Rust art constants, import them back. No build step. |
 | `web/tools/tracker.html` | Tracker: four tracks, live preview through the console's own synth in WebAssembly, exports a `Song`. |
-| `docs/` | [Manual](docs/MANUAL.md) · [Architecture](docs/ARCHITECTURE.md) · [Determinism](docs/DETERMINISM.md) · [Netcode](docs/NETCODE.md) · [Decisions](docs/DECISIONS.md) · [Roadmap](docs/ROADMAP.md) |
+| `docs/` | [Manual](docs/MANUAL.md) · [Cookbook](docs/COOKBOOK.md) · [Architecture](docs/ARCHITECTURE.md) · [Determinism](docs/DETERMINISM.md) · [Netcode](docs/NETCODE.md) · [Decisions](docs/DECISIONS.md) · [Roadmap](docs/ROADMAP.md) |
 | `scripts/check.sh` | The full quality gate CI runs: fmt, clippy, docs, tests, placeholder scan, release build, headless smoke, replay verify. |
 
 ## Performance
