@@ -20,3 +20,6 @@ node web/test/netplay.mjs
 echo "== web: tile editor exports art the console parses"
 node web/test/tiles.mjs
 cargo run $J -q -p kagami --example art_check -- web/dist/tiles-export.rs
+echo "== web: tracker export parses natively and the wasm synth matches the native synth sample for sample"
+node web/test/tracker.mjs
+cargo run $J -q -p kagami --example song_check -- web/dist/song-export.rs web/dist/song-samples.bin

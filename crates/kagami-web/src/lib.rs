@@ -28,10 +28,11 @@
 // operations; the exports below are plain safe Rust. Allowed only here.
 #![allow(unsafe_code)]
 
-use kagami::apu::SAMPLES_PER_FRAME;
+use kagami::apu::{Row, Song, Track, Waveform, SAMPLES_PER_FRAME};
 use kagami::net::{Lockstep, LockstepConfig, Rollback, RollbackConfig, StepResult, Transport};
 use kagami::replay::Replay;
 use kagami::{Apu, Game, Gpu, Input, StateHasher, UpdateCtx, MAX_PLAYERS, SCREEN_H, SCREEN_W};
+use kagami::{Sfx, SfxStep};
 use std::collections::{BTreeMap, VecDeque};
 
 /// Largest datagram the host may hand to the module.
@@ -62,6 +63,119 @@ impl Transport for QueueTransport {
     }
     fn recv(&mut self) -> Option<Vec<u8>> {
         self.inbox.pop_front()
+    }
+}
+
+/// A standalone sound processor for authoring tools: build a song row by
+/// row, play it, render frames. Independent of any cartridge.
+pub struct Preview {
+    apu: Apu,
+    frames_per_row: u8,
+    looped: bool,
+    tracks: Vec<Track>,
+    audio: [i16; SAMPLES_PER_FRAME],
+}
+
+impl Default for Preview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Preview {
+    /// A silent preview with no song.
+    pub fn new() -> Preview {
+        Preview {
+            apu: Apu::new(),
+            frames_per_row: 8,
+            looped: true,
+            tracks: Vec::new(),
+            audio: [0; SAMPLES_PER_FRAME],
+        }
+    }
+
+    /// Clears the song under construction and sets its tempo and looping.
+    pub fn begin_song(&mut self, frames_per_row: u8, looped: bool) {
+        self.frames_per_row = frames_per_row.max(1);
+        self.looped = looped;
+        self.tracks.clear();
+    }
+
+    /// Adds a track with a waveform (`0..=5` in [`Waveform`] order).
+    pub fn add_track(&mut self, wave: u8) {
+        if self.tracks.len() < kagami::apu::CHANNELS {
+            self.tracks.push(Track {
+                wave: waveform(wave),
+                rows: Vec::new(),
+            });
+        }
+    }
+
+    /// Appends a row to a track: `kind` 0 = hold, 1 = off, 2 = note on.
+    pub fn push_row(&mut self, track: usize, kind: u8, note: u8, vol: u8) {
+        if let Some(t) = self.tracks.get_mut(track) {
+            t.rows.push(match kind {
+                0 => Row::hold(),
+                1 => Row::off(),
+                _ => Row::on(note.min(127), vol.min(15)),
+            });
+        }
+    }
+
+    /// Starts the song built so far from the top.
+    pub fn play(&mut self) {
+        self.apu = Apu::new();
+        self.apu.play_song(self.song());
+    }
+
+    /// Stops playback.
+    pub fn stop(&mut self) {
+        self.apu.stop_song();
+    }
+
+    /// Plays one note as a 20-frame effect, for auditioning while editing.
+    pub fn audition(&mut self, wave: u8, note: u8, vol: u8) {
+        let sfx = Sfx::new(
+            waveform(wave),
+            &[SfxStep::new(note.min(127), vol.min(15), 20)],
+        );
+        self.apu.sfx(0, &sfx);
+    }
+
+    /// The song as built.
+    pub fn song(&self) -> Song {
+        Song {
+            frames_per_row: self.frames_per_row,
+            tracks: self.tracks.clone(),
+            looped: self.looped,
+        }
+    }
+
+    /// Renders one frame of audio.
+    pub fn render(&mut self) {
+        self.apu.render_frame(&mut self.audio);
+    }
+
+    /// The last rendered frame.
+    pub fn audio(&self) -> &[i16; SAMPLES_PER_FRAME] {
+        &self.audio
+    }
+
+    /// Current song row, or `u32::MAX` when nothing plays.
+    pub fn row(&self) -> u32 {
+        self.apu.song_row().map_or(u32::MAX, |r| r as u32)
+    }
+}
+
+/// Maps a small integer to a waveform, for tool hosts.
+pub fn waveform(i: u8) -> Waveform {
+    match i {
+        0 => Waveform::Pulse12,
+        1 => Waveform::Pulse25,
+        3 => Waveform::Pulse75,
+        4 => Waveform::Triangle,
+        5 => Waveform::Noise,
+        _ => Waveform::Pulse50,
     }
 }
 
@@ -569,6 +683,13 @@ pub const HEIGHT: u32 = SCREEN_H as u32;
 /// | `kagami_replay_load() -> u32` | play back the staged replay; its frame count, or `0xFFFF_FFFF` if invalid |
 /// | `kagami_replay_verify() -> u32` | 0 = all checkpoints match, n = first mismatch at frame n-1, `0xFFFF_FFFF` = invalid |
 /// | `kagami_replay_playing() -> u32`, `kagami_replay_len() -> u32` | playback state |
+/// | `kagami_apu_begin(frames_per_row, looped)` | start building a preview song (tools) |
+/// | `kagami_apu_track(wave)` | add a track: 0 pulse12, 1 pulse25, 2 pulse50, 3 pulse75, 4 triangle, 5 noise |
+/// | `kagami_apu_row(track, kind, note, vol)` | append a row: kind 0 hold, 1 off, 2 note on |
+/// | `kagami_apu_play()`, `kagami_apu_stop()` | play the built song from the top, stop it |
+/// | `kagami_apu_audition(wave, note, vol)` | play one note for 20 frames |
+/// | `kagami_apu_render()`, `kagami_apu_ptr()` | render one frame of preview audio and read it |
+/// | `kagami_apu_row_index() -> u32` | current song row, `0xFFFF_FFFF` when stopped |
 ///
 /// Pointers are valid until the next `kagami_init`; the framebuffer and
 /// audio buffers are reused across frames, so copy them out after each step.
@@ -776,6 +897,59 @@ macro_rules! cartridge {
             #[no_mangle]
             pub extern "C" fn kagami_replay_len() -> u32 {
                 with(|c| c.playback_len())
+            }
+
+            thread_local! {
+                static PREVIEW: RefCell<$crate::Preview> = RefCell::new($crate::Preview::new());
+            }
+
+            fn preview<R>(f: impl FnOnce(&mut $crate::Preview) -> R) -> R {
+                PREVIEW.with(|p| f(&mut p.borrow_mut()))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_begin(frames_per_row: u32, looped: u32) {
+                preview(|p| p.begin_song(frames_per_row as u8, looped != 0));
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_track(wave: u32) {
+                preview(|p| p.add_track(wave as u8));
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_row(track: u32, kind: u32, note: u32, vol: u32) {
+                preview(|p| p.push_row(track as usize, kind as u8, note as u8, vol as u8));
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_play() {
+                preview($crate::Preview::play);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_stop() {
+                preview($crate::Preview::stop);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_audition(wave: u32, note: u32, vol: u32) {
+                preview(|p| p.audition(wave as u8, note as u8, vol as u8));
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_render() {
+                preview($crate::Preview::render);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_ptr() -> *const i16 {
+                preview(|p| p.audio().as_ptr())
+            }
+
+            #[no_mangle]
+            pub extern "C" fn kagami_apu_row_index() -> u32 {
+                preview(|p| p.row())
             }
         }
     };
@@ -999,6 +1173,55 @@ mod tests {
     }
 
     #[test]
+    fn preview_builds_and_plays_songs() {
+        let mut p = Preview::new();
+        assert_eq!(p.row(), u32::MAX);
+        p.render();
+        assert!(p.audio().iter().all(|&s| s == 0));
+        p.begin_song(2, false);
+        p.add_track(4);
+        p.add_track(5);
+        for _ in 0..6 {
+            p.add_track(2); // only four channels exist
+        }
+        p.push_row(0, 2, 60, 12);
+        p.push_row(0, 0, 0, 0);
+        p.push_row(0, 1, 0, 0);
+        p.push_row(1, 2, 40, 9);
+        p.push_row(9, 2, 40, 9); // no such track: ignored
+        let song = p.song();
+        assert_eq!(song.tracks.len(), 4);
+        assert_eq!(song.tracks[0].rows.len(), 3);
+        assert_eq!(song.tracks[0].wave, Waveform::Triangle);
+        assert_eq!(song.tracks[1].wave, Waveform::Noise);
+        assert_eq!(song.frames_per_row, 2);
+        assert!(!song.looped);
+        p.play();
+        assert_eq!(p.row(), 0);
+        p.render();
+        assert!(p.audio().iter().any(|&s| s != 0));
+        // Native synth and preview agree sample for sample.
+        let mut apu = Apu::new();
+        apu.play_song(song);
+        let mut buf = [0i16; SAMPLES_PER_FRAME];
+        apu.render_frame(&mut buf);
+        assert_eq!(&buf[..], &p.audio()[..]);
+        for _ in 0..8 {
+            p.render();
+        }
+        assert_eq!(p.row(), u32::MAX, "an unlooped song ends");
+        p.audition(0, 69, 10);
+        p.render();
+        assert!(p.audio().iter().any(|&s| s != 0));
+        p.stop();
+        assert_eq!(waveform(0), Waveform::Pulse12);
+        assert_eq!(waveform(1), Waveform::Pulse25);
+        assert_eq!(waveform(3), Waveform::Pulse75);
+        assert_eq!(waveform(99), Waveform::Pulse50);
+        let _ = Preview::default();
+    }
+
+    #[test]
     fn staging_buffers_round_trip_datagrams() {
         let mut c: Console<Blink> = Console::new(1, 2);
         c.start_net(0, 2, 1, 0);
@@ -1079,5 +1302,15 @@ mod tests {
         assert_eq!(x::kagami_replay_verify(), u32::MAX);
         assert_eq!(x::kagami_replay_playing(), 0);
         assert_eq!(x::kagami_replay_len(), 0);
+        // APU preview exports.
+        x::kagami_apu_begin(4, 1);
+        x::kagami_apu_track(2);
+        x::kagami_apu_row(0, 2, 60, 10);
+        x::kagami_apu_play();
+        assert_eq!(x::kagami_apu_row_index(), 0);
+        x::kagami_apu_render();
+        assert!(!x::kagami_apu_ptr().is_null());
+        x::kagami_apu_audition(4, 50, 8);
+        x::kagami_apu_stop();
     }
 }

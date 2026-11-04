@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAGAMI tracker</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #1c1c1c; color: #f8f4e6; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  header { padding: 10px 16px; border-bottom: 1px solid #223a70; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  main { display: grid; grid-template-columns: auto 1fr; gap: 16px; padding: 16px; }
+  table { border-collapse: collapse; user-select: none; }
+  th, td { border: 1px solid #223a70; padding: 2px 6px; text-align: center; min-width: 54px; }
+  td.cur { outline: 2px solid #f8b500; }
+  tr.playing td { background: #163a3f; }
+  tr.beat td:first-child { color: #f8b500; }
+  td.on { color: #ffd900; } td.off { color: #c9171e; } td.hold { opacity: .35; }
+  textarea { width: 100%; min-height: 220px; background: #111; color: #a0d8ef; border: 1px solid #223a70; font: inherit; white-space: pre; }
+  button, select, input { font: inherit; background: #223a70; color: #fffffc; border: 0; padding: 5px 10px; cursor: pointer; }
+  button:hover { background: #165e83; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  .side { max-width: 560px; }
+  .hint { opacity: .7; }
+  .wave select { background: #111; }
+</style>
+</head>
+<body>
+<header>
+  <b>鏡 tracker</b>
+  <button id="play">▶ play</button>
+  <button id="stop">■ stop</button>
+  <label>frames/row <input id="fpr" type="number" min="1" max="30" value="8" size="3"></label>
+  <label>rows <input id="rows" type="number" min="4" max="128" value="32" size="4"></label>
+  <label><input id="loop" type="checkbox" checked> loop</label>
+  <label>octave <input id="oct" type="number" min="1" max="8" value="4" size="2"></label>
+  <label>vol <input id="vol" type="number" min="0" max="15" value="10" size="3"></label>
+  <span class="hint">keys: Z S X D C V G B H N J M = C..B · Q W E R T Y U I O P = next octave · Backspace = off · Delete = hold · arrows move</span>
+</header>
+<main>
+  <div>
+    <table id="grid"></table>
+  </div>
+  <div class="side">
+    <p><button id="export">export Rust</button> <button id="import">import from text</button> <button id="copy">copy</button> <span id="status" class="hint">loading…</span></p>
+    <textarea id="out" spellcheck="false"></textarea>
+    <p class="hint">Sound is the console's own synthesizer running in WebAssembly, so what you hear is exactly what the cartridge will play. Exports drop into a <code>music.rs</code>: <code>ctx.apu.play_song(song())</code>.</p>
+  </div>
+</main>
+<script type="module">
+  const NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+  const WAVES = ['Pulse12', 'Pulse25', 'Pulse50', 'Pulse75', 'Triangle', 'Noise'];
+  const KEYS = { KeyZ: 0, KeyS: 1, KeyX: 2, KeyD: 3, KeyC: 4, KeyV: 5, KeyG: 6, KeyB: 7, KeyH: 8, KeyN: 9, KeyJ: 10, KeyM: 11,
+                 KeyQ: 12, KeyW: 13, KeyE: 14, KeyR: 15, KeyT: 16, KeyY: 17, KeyU: 18, KeyI: 19, KeyO: 20, KeyP: 21 };
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const wasmUrl = params.get('wasm') ?? '../dist/ippon.wasm';
+  let x = null;
+  try {
+    const { instance } = await WebAssembly.instantiateStreaming(fetch(wasmUrl), {});
+    x = instance.exports;
+    $('status').textContent = 'synth ready';
+  } catch (e) {
+    $('status').textContent = 'no synth (build web/dist first); editing still works';
+  }
+
+  // Song model: tracks[t].wave, tracks[t].rows[r] = {kind: 'hold'|'off'|'on', note, vol}
+  let rows = 32;
+  const tracks = [2, 1, 4, 5].map((wave) => ({ wave, rows: Array.from({ length: rows }, () => ({ kind: 'hold', note: 60, vol: 10 })) }));
+  let cur = { t: 0, r: 0 };
+  let playingRow = -1;
+
+  const cellText = (c) => c.kind === 'on' ? `${NAMES[c.note % 12]}${Math.floor(c.note / 12) - 1} ${c.vol.toString(16).toUpperCase()}` : c.kind === 'off' ? '===' : '···';
+  const render = () => {
+    const g = $('grid');
+    let html = '<tr><th>row</th>' + tracks.map((t, i) => `<th class="wave">ch${i} <select data-t="${i}">${WAVES.map((w, k) => `<option value="${k}" ${t.wave === k ? 'selected' : ''}>${w}</option>`).join('')}</select></th>`).join('') + '</tr>';
+    for (let r = 0; r < rows; r++) {
+      html += `<tr class="${r % 4 === 0 ? 'beat' : ''} ${r === playingRow ? 'playing' : ''}"><td>${r.toString().padStart(2, '0')}</td>`;
+      for (let t = 0; t < tracks.length; t++) {
+        const c = tracks[t].rows[r];
+        html += `<td class="${c.kind} ${cur.t === t && cur.r === r ? 'cur' : ''}" data-t="${t}" data-r="${r}">${cellText(c)}</td>`;
+      }
+      html += '</tr>';
+    }
+    g.innerHTML = html;
+    g.querySelectorAll('select').forEach((s) => s.addEventListener('change', () => { tracks[Number(s.dataset.t)].wave = Number(s.value); }));
+    g.querySelectorAll('td[data-t]').forEach((td) => td.addEventListener('click', () => { cur = { t: Number(td.dataset.t), r: Number(td.dataset.r) }; render(); }));
+  };
+  const setRows = (n) => {
+    rows = n;
+    for (const t of tracks) while (t.rows.length < n) t.rows.push({ kind: 'hold', note: 60, vol: 10 });
+    for (const t of tracks) t.rows.length = n;
+    cur.r = Math.min(cur.r, rows - 1);
+    render();
+  };
+  const setCell = (kind, note) => {
+    const c = tracks[cur.t].rows[cur.r];
+    c.kind = kind;
+    if (kind === 'on') { c.note = note; c.vol = Number($('vol').value); if (x) x.kagami_apu_audition(tracks[cur.t].wave, note, c.vol); }
+    cur.r = (cur.r + 1) % rows;
+    render();
+  };
+  window.addEventListener('keydown', (e) => {
+    if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+    if (e.code in KEYS) { setCell('on', (Number($('oct').value) + 1) * 12 + KEYS[e.code]); e.preventDefault(); return; }
+    if (e.code === 'Backspace') { setCell('off'); e.preventDefault(); return; }
+    if (e.code === 'Delete') { setCell('hold'); e.preventDefault(); return; }
+    if (e.code === 'ArrowDown') cur.r = (cur.r + 1) % rows;
+    if (e.code === 'ArrowUp') cur.r = (cur.r + rows - 1) % rows;
+    if (e.code === 'ArrowRight') cur.t = (cur.t + 1) % tracks.length;
+    if (e.code === 'ArrowLeft') cur.t = (cur.t + tracks.length - 1) % tracks.length;
+    if (e.code === 'Space') { e.preventDefault(); playing ? stop() : play(); }
+    render();
+  });
+
+  // Playback: the wasm synth renders 735-sample frames; we schedule them.
+  let audio = null, playing = false, nextTime = 0, timer = null;
+  const pushSong = () => {
+    x.kagami_apu_begin(Number($('fpr').value), $('loop').checked ? 1 : 0);
+    for (const t of tracks) {
+      x.kagami_apu_track(t.wave);
+    }
+    tracks.forEach((t, i) => t.rows.forEach((c) => x.kagami_apu_row(i, c.kind === 'hold' ? 0 : c.kind === 'off' ? 1 : 2, c.note, c.vol)));
+  };
+  const pump = () => {
+    if (!playing) return;
+    while (nextTime < audio.currentTime + 0.15) {
+      x.kagami_apu_render();
+      const n = 735;
+      const samples = new Int16Array(x.memory.buffer, x.kagami_apu_ptr(), n);
+      const buffer = audio.createBuffer(1, n, 44100);
+      const ch = buffer.getChannelData(0);
+      for (let i = 0; i < n; i++) ch[i] = samples[i] / 32768;
+      const src = audio.createBufferSource();
+      src.buffer = buffer; src.connect(audio.destination); src.start(nextTime);
+      nextTime += n / 44100;
+      const r = x.kagami_apu_row_index() >>> 0;
+      playingRow = r === 0xFFFFFFFF ? -1 : r;
+      if (r === 0xFFFFFFFF && !$('loop').checked) { stop(); return; }
+    }
+    render();
+  };
+  const play = () => {
+    if (!x) return;
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    pushSong();
+    x.kagami_apu_play();
+    playing = true;
+    nextTime = audio.currentTime + 0.05;
+    timer = setInterval(pump, 50);
+  };
+  const stop = () => { playing = false; clearInterval(timer); if (x) x.kagami_apu_stop(); playingRow = -1; render(); };
+  $('play').addEventListener('click', play);
+  $('stop').addEventListener('click', stop);
+  $('rows').addEventListener('change', () => setRows(Number($('rows').value)));
+
+  // Rust export/import.
+  const exportRust = () => {
+    const rowSrc = (c) => c.kind === 'on' ? `Row::on(${c.note}, ${c.vol})` : c.kind === 'off' ? 'Row::off()' : 'Row::hold()';
+    const trackSrc = tracks.map((t) => `        Track {\n            wave: Waveform::${WAVES[t.wave]},\n            rows: vec![\n${t.rows.map((c) => `                ${rowSrc(c)},`).join('\n')}\n            ],\n        },`).join('\n');
+    return `// generated by web/tools/tracker.html\nuse kagami::apu::{Row, Song, Track, Waveform};\n\n/// The song.\npub fn song() -> Song {\n    Song {\n        frames_per_row: ${Number($('fpr').value)},\n        tracks: vec![\n${trackSrc}\n        ],\n        looped: ${$('loop').checked},\n    }\n}\n`;
+  };
+  const importRust = (text) => {
+    const fpr = text.match(/frames_per_row:\s*(\d+)/);
+    const looped = text.match(/looped:\s*(true|false)/);
+    const trackParts = text.split(/Track\s*\{/).slice(1);
+    if (!trackParts.length) return false;
+    const parsed = trackParts.map((part) => {
+      const wave = part.match(/Waveform::(\w+)/);
+      const rowsFound = [...part.matchAll(/Row::(on|off|hold)\(\s*(?:(\d+)\s*,\s*(\d+))?\s*\)/g)].map((m) => m[1] === 'on' ? { kind: 'on', note: Number(m[2]), vol: Number(m[3]) } : { kind: m[1], note: 60, vol: 10 });
+      return { wave: Math.max(0, WAVES.indexOf(wave ? wave[1] : 'Pulse50')), rows: rowsFound };
+    });
+    const n = Math.max(4, ...parsed.map((t) => t.rows.length));
+    tracks.length = 0;
+    parsed.slice(0, 4).forEach((t) => tracks.push(t));
+    while (tracks.length < 4) tracks.push({ wave: 2, rows: [] });
+    if (fpr) $('fpr').value = fpr[1];
+    if (looped) $('loop').checked = looped[1] === 'true';
+    $('rows').value = n;
+    setRows(n);
+    return true;
+  };
+  $('export').addEventListener('click', () => { $('out').value = exportRust(); });
+  $('import').addEventListener('click', () => { if (!importRust($('out').value)) alert('no song found'); });
+  $('copy').addEventListener('click', () => navigator.clipboard.writeText($('out').value));
+  render();
+  window.tracker = {
+    tracks, exportRust, importRust, setRows,
+    set(t, r, cell) { Object.assign(tracks[t].rows[r], cell); render(); },
+    /** Render n frames through the wasm synth and return the samples (tests). */
+    renderFrames(n) {
+      if (!x) return null;
+      pushSong(); x.kagami_apu_play();
+      const out = [];
+      for (let i = 0; i < n; i++) { x.kagami_apu_render(); out.push(...new Int16Array(x.memory.buffer, x.kagami_apu_ptr(), 735)); }
+      return out;
+    },
+    get ready() { return x !== null; },
+  };
+</script>
+</body>
+</html>

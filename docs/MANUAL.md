@@ -243,6 +243,11 @@ takes over its voice until it finishes, then the song resumes there. The
 synthesizer uses integer arithmetic only, so even the sample stream is
 bit-identical everywhere.
 
+`web/tools/tracker.html` is a tracker that plays through this exact
+synthesizer (the WebAssembly build) and exports a `song()` function to drop
+into a `music.rs`. `cargo run -p kagami --example song_check -- file.rs`
+parses an export and renders it natively.
+
 ## 6. Arithmetic (`kagami::Fx`)
 
 ```rust

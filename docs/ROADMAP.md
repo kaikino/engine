@@ -33,11 +33,12 @@ These are the console. Changing them would make a different console.
 - Gamepads in the browser host.
 - Browser replays, interchangeable with native ones.
 - Tile editor exporting Rust art.
+- Tracker with live synth preview exporting `Song` source.
 
 ## v0.2 candidates
 
-1. A tracker that writes `Song` source (the tile editor exists).
-2. A native-to-browser bridge transport.
+1. A native-to-browser bridge transport.
+2. A cartridge gallery page listing every `.wasm` in `web/dist`.
 
 ## How to propose a change
 
