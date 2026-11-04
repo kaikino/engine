@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/kagami", "crates/kagami-runtime", "crates/kagami-web", "games/hello", "games/ippon"]
+members = ["crates/kagami", "crates/kagami-runtime", "crates/kagami-web", "games/hello", "games/ippon", "games/hanabi"]
 
 [workspace.package]
 version = "0.1.0"

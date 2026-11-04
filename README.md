@@ -18,6 +18,10 @@ exact frame.
   <img src="docs/screenshots/men_2x.png" width="32%" alt="A scored point: MEN! IPPON SHIRO">
   <img src="docs/screenshots/fight_2x.png" width="32%" alt="Mid-strike during a match">
 </p>
+<p align="center">
+  <img src="docs/screenshots/hanabi_2x.png" width="48%" alt="HANABI: boats on a festival river under fireworks">
+  <img src="docs/screenshots/hanabi_title_2x.png" width="48%" alt="HANABI title screen">
+</p>
 
 ## The hardware
 
@@ -49,7 +53,8 @@ cd kagami
 cargo run --release -p ippon
 ```
 
-That opens **IPPON**, a two-player kendo duel. Player 1 uses the arrow keys
+That opens **IPPON**, a two-player kendo duel. `cargo run --release -p hanabi`
+opens **HANABI**, a two-player shooter over a festival river. Player 1 uses the arrow keys
 with Z to strike and X to guard. Player 2 uses WASD with J and K. Press Enter
 to start. Two ippon win the match. Alone? `--players 1` puts a CPU in the
 red hakama.
@@ -147,6 +152,7 @@ Everything you need to know is in **[the manual](docs/MANUAL.md)**.
 | `crates/kagami` | The console: math, GPU, APU, input, lockstep, replays. No dependencies. |
 | `crates/kagami-runtime` | Native runtime: window, keyboard, audio, headless mode, CLI. |
 | `games/ippon` | IPPON, the reference cartridge, with the engine's end-to-end tests. |
+| `games/hanabi` | HANABI, a two-player festival-night shooter that leans on scrolling, line-scroll reflections and the sprite budget. |
 | `games/hello` | The smallest possible cartridge. |
 | `crates/kagami-web` | C ABI over the console for the browser; `web/` holds the JavaScript host and its Playwright test. |
 | `docs/` | [Manual](docs/MANUAL.md) · [Architecture](docs/ARCHITECTURE.md) · [Determinism](docs/DETERMINISM.md) · [Netcode](docs/NETCODE.md) · [Decisions](docs/DECISIONS.md) · [Roadmap](docs/ROADMAP.md) |

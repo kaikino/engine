@@ -23,6 +23,8 @@ compatibility) are marked **[sim]**.
 - **Save data.** `Game::load_sram` / `Game::save_sram` with a 2 KB budget; the runtime persists `kagami-<title>.sram` for local play (`--sram`, `--no-sram`). IPPON keeps a lifetime win record on its title screen.
 - **Gamepads.** The runtime reads gamepads through `gilrs` (feature `gamepad`, on by default), first pad to player 1, merged with the keyboard; `--no-gamepad` ignores them.
 
+- **HANABI**, a second cartridge: a two-player co-op vertical shooter on a scrolling festival river with a per-scanline water reflection, bombs, oni bosses, a saved high score, kana text, and enough lanterns to overrun the 16-sprite scanline budget on purpose (its tests assert that it does). Builds for the browser too.
+
 ### Changed
 
 - **[api]** `Game` now requires `Clone` (rollback needs to snapshot it). Deriving it is enough for plain-data games.

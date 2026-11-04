@@ -43,7 +43,7 @@ jobs:
           mkdir -p "dist/$name"
           ext=""
           if [[ "${{ runner.os }}" == "Windows" ]]; then ext=".exe"; fi
-          cp "target/${{ matrix.target }}/release/ippon$ext" "target/${{ matrix.target }}/release/hello$ext" "dist/$name/"
+          cp "target/${{ matrix.target }}/release/ippon$ext" "target/${{ matrix.target }}/release/hanabi$ext" "target/${{ matrix.target }}/release/hello$ext" "dist/$name/"
           cp README.md LICENSE CHANGELOG.md docs/MANUAL.md "dist/$name/"
           cp docs/replays/demo.kgmr "dist/$name/"
           cd dist

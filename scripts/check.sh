@@ -24,6 +24,8 @@ target/release/ippon --headless --frames 600 --random-inputs --seed 42 \
   --record "$tmp/smoke.kgmr" --screenshot "$tmp/smoke.png" | tee "$tmp/report.txt"
 target/release/ippon --verify "$tmp/smoke.kgmr" | tee -a "$tmp/report.txt"
 grep -q "verify: OK" "$tmp/report.txt"
+echo "== headless smoke: HANABI 600 frames"
+target/release/hanabi --headless --frames 600 --random-inputs --seed 42 --screenshot "$tmp/hanabi.png" | grep "state hash"
 echo "== golden replay from docs/replays verifies on this build"
 target/release/ippon --verify docs/replays/demo.kgmr | grep "verify: OK"
 echo "== all checks passed"

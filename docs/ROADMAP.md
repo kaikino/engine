@@ -28,12 +28,13 @@ These are the console. Changing them would make a different console.
 - Katakana in the system font.
 - Raster effects: per-line scroll, window masks, mosaic.
 - Save data (2 KB SRAM per cartridge) and gamepads.
+- HANABI, a second cartridge exercising scrolling, raster effects and the sprite budget.
 
 ## v0.2 candidates
 
 1. WebRTC transport for browser netplay.
-2. A second cartridge that exercises scrolling backgrounds and the sprite budget.
-3. Gamepads in the browser host.
+2. Gamepads in the browser host.
+3. A tracker and tile editor that write Rust source.
 
 ## How to propose a change
 
